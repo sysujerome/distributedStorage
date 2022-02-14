@@ -32,7 +32,7 @@ func (s *server) Get(ctx context.Context, in *pb.GetRequest) (*pb.GetReply, erro
 	// log.Printf("Received get key: %v", in.GetKey())
 	res, err := rdb.Get(ctx, in.GetKey()).Result()
 	if err != nil {
-		log.Fatal("get redis db failed: ", err)
+		return &pb.GetReply{Result: "not fount request: " + in.GetKey()}, nil
 	}
 	return &pb.GetReply{Result: "succeed! request: " + in.GetKey() + " get: " + res}, nil
 }

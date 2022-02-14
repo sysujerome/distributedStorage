@@ -20,9 +20,14 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"flag"
+	"fmt"
 	"log"
+	"os"
+	"path"
+	"strings"
 	"time"
 
 	pb "example.com/kvstore"
@@ -32,6 +37,7 @@ import (
 
 var (
 	addr = flag.String("addr", "localhost:50051", "the address to connect to")
+	pwd  = flag.String("project_path", "/home/jerome/lab/distributedStorage/demo/", "the path of demo")
 )
 
 func main() {
@@ -47,14 +53,35 @@ func main() {
 	// Contact the server and print out its response.
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second))
 	defer cancel()
-	r, err := c.Set(ctx, &pb.SetRequest{Key: "jerome", Value: "cliffia"})
-	if err != nil {
-		log.Fatalf("could not greet: %v", err)
+
+	f, err := os.Open(path.Join(*pwd, "util/benchmark_data"))
+	check(err)
+	defer f.Close()
+	sc := bufio.NewScanner(f)
+	start := time.Now()
+	counter := 0
+	for sc.Scan() {
+		operation := strings.Split(sc.Text(), " ")
+		opt := operation[0]
+		switch opt {
+		case "get":
+			_, err := c.Get(ctx, &pb.GetRequest{Key: operation[1]})
+			check(err)
+		case "set":
+			_, err := c.Set(ctx, &pb.SetRequest{Key: operation[1], Value: operation[2]})
+			check(err)
+		case "del":
+			_, err := c.Del(ctx, &pb.DelRequest{Key: operation[1]})
+			check(err)
+		}
+		counter++
 	}
-	log.Printf("SetKey: %s\n", r.GetResult())
-	r1, err := c.Get(ctx, &pb.GetRequest{Key: "jerome"})
-	if err != nil {
-		log.Fatalf("could not greet: %v", err)
+	duration := time.Since(start)
+	fmt.Printf("dealing with %d operations took %v Seconds\n", counter, duration.Seconds())
+}
+
+func check(e error) {
+	if e != nil {
+		log.Fatal(e)
 	}
-	log.Printf("GetKey: %s\n", r1.GetResult())
 }
