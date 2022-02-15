@@ -26,7 +26,7 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -36,13 +36,22 @@ import (
 )
 
 var (
-	addr = flag.String("addr", "localhost:50051", "the address to connect to")
-	pwd  = flag.String("project_path", "/home/jerome/lab/distributedStorage/demo/", "the path of demo")
+	addr = flag.String("addr", "localhost", "the address to connect to")
 )
 
 func main() {
 	flag.Parse()
 	// Set up a connection to the server.
+	if len(os.Args) < 2 {
+		log.Printf("usage: %s port number", string(os.Args[0]))
+	}
+	port := os.Args[1]
+	if port == "50050" {
+		fmt.Printf("store inside: ")
+	} else {
+		fmt.Printf("store in redis: ")
+	}
+	*addr = *addr + ":" + port
 	conn, err := grpc.Dial(*addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
@@ -51,26 +60,34 @@ func main() {
 	c := pb.NewStorageClient(conn)
 
 	// Contact the server and print out its response.
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second))
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
 	defer cancel()
 
-	f, err := os.Open(path.Join(*pwd, "util/benchmark_data"))
+	currentPath, err := os.Getwd()
+	check(err)
+	filename := filepath.Join(currentPath, "data/benchmark_data")
+	f, err := os.Open(filename)
 	check(err)
 	defer f.Close()
 	sc := bufio.NewScanner(f)
-	start := time.Now()
+	// data := make([][]string, 0)
 	counter := 0
+	start := time.Now()
 	for sc.Scan() {
 		operation := strings.Split(sc.Text(), " ")
+		// fmt.Println(operation)
 		opt := operation[0]
 		switch opt {
 		case "get":
+			// continue
 			_, err := c.Get(ctx, &pb.GetRequest{Key: operation[1]})
 			check(err)
 		case "set":
+			// continue
 			_, err := c.Set(ctx, &pb.SetRequest{Key: operation[1], Value: operation[2]})
 			check(err)
 		case "del":
+			// continue
 			_, err := c.Del(ctx, &pb.DelRequest{Key: operation[1]})
 			check(err)
 		}

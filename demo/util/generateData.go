@@ -1,8 +1,11 @@
 package main
 
 import (
+	"flag"
 	"math/rand"
 	"os"
+	"path/filepath"
+	"strconv"
 	"time"
 )
 
@@ -13,6 +16,7 @@ func init() {
 var (
 	letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 	operators   = []string{"get", "set", "del"}
+	// length      = flag.Int("length", 100000, "the number of cases")
 )
 
 func RandStringRunes(n int) string {
@@ -32,12 +36,17 @@ func check(e error) {
 func main() {
 	// you need to ensure that the base directory exists, because os.Create does not handle it.
 	// err := os.WriteFile("pangjinglongtmpfile", []byte(RandStringRunes(10)), 0644)
-	f, err := os.Create("benchmark_data")
+	flag.Parse()
+	path, _ := os.Getwd()
+	filename := filepath.Join(path, "/data/benchmark_data")
+	f, err := os.Create(filename)
 	newline := ""
 	var key, value string
 	check(err)
 	defer f.Close()
-	for i := 0; i < 1000; i++ {
+	length, err := strconv.ParseInt(os.Args[1], 0, 64)
+	check(err)
+	for i := 0; i < int(length); i++ {
 		opt := operators[rand.Intn(len(operators))]
 		switch opt {
 		case "get":
