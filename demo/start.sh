@@ -49,9 +49,6 @@ else
     fi
 fi
 
-ps -ef | grep redis-server | grep -v grep | awk '{print $2}' | xargs kill -9
-ps -ef | grep server/storeInside.go | grep -v grep | awk '{print $2}' | xargs kill -9
-ps -ef | grep server/main.go | grep -v grep | awk '{print $2}' | xargs kill -9
 
 redis-server &> /dev/null &
 go run server/main.go &> /dev/null &
@@ -60,6 +57,8 @@ go build -o cli client/main.go
 ./cli 50050
 ./cli 50051
 
-ps -ef | grep redis-server | grep -v grep | awk '{print $2}' | xargs kill -9
-ps -ef | grep server/storeInside.go | grep -v grep | awk '{print $2}' | xargs kill -9
-ps -ef | grep server/main.go | grep -v grep | awk '{print $2}' | xargs kill -9
+sleep 1s
+
+ps -ef | grep redis-server | grep -v grep | awk '{print $2}' | xargs kill -9 &> /dev/null &
+ps -ef | grep server/storeInside.go | grep -v grep | awk '{print $2}' | xargs kill -9 &> /dev/null &
+ps -ef | grep server/main.go | grep -v grep | awk '{print $2}' | xargs kill -9 &> /dev/null &
