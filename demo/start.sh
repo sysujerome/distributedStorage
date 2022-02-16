@@ -50,21 +50,21 @@ else
 fi
 
 
-redis-server &> /dev/null &> /dev/null &
-go build -o storeInRedis server/storeInRedis.go 
-go build -o storeInRemoteRedis server/storeInRemoteRedis.go 
-go build -o storeInside server/storeInside.go
-./storeInRedis &
-./storeInRemoteRedis  &
-./storeInside &
-sleep 1s
+# redis-server &> /dev/null &> /dev/null &
+# go build -o storeInRedis server/storeInRedis.go 
+# go build -o storeInRemoteRedis server/storeInRemoteRedis.go 
+# go build -o storeInside server/storeInside.go
+# ./storeInRedis &
+# ./storeInRemoteRedis  &
+# ./storeInside &
+# sleep 1s
 
-go build -o cli client/main.go
-./cli 50050
-./cli 50052
-./cli 50051
+# go build -o cli client/main.go
+# ./cli 50050
+# ./cli 50052
+# ./cli 50051
 
-sleep 1s
+# sleep 1s
 
 ps -ef | grep redis-server | grep -v grep | awk '{print $2}' | xargs kill -9 &> /dev/null &
 ps -ef | grep storeInside | grep -v grep | awk '{print $2}' | xargs kill -9 &> /dev/null &
