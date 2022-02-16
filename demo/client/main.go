@@ -36,22 +36,24 @@ import (
 )
 
 var (
-	addr = flag.String("addr", "localhost:50050", "the address to connect to")
+	addr = flag.String("addr", "localhost", "the address to connect to")
 )
 
 func main() {
 	flag.Parse()
 	// Set up a connection to the server.
-	// if len(os.Args) < 2 {
-	// 	log.Printf("usage: %s port number", string(os.Args[0]))
-	// }
-	// port := os.Args[1]
-	// if port == "50050" {
-	// 	fmt.Printf("store inside: ")
-	// } else {
-	// 	fmt.Printf("store in redis: ")
-	// }
-	// *addr = *addr + ":" + port
+	if len(os.Args) < 2 {
+		log.Printf("usage: %s port number", string(os.Args[0]))
+	}
+	port := os.Args[1]
+	if port == "50051" {
+		fmt.Printf("store inside: ")
+	} else if port == "50050" {
+		fmt.Printf("store in local redis: ")
+	} else {
+		fmt.Printf("store in remote redis: ")
+	}
+	*addr = *addr + ":" + port
 	conn, err := grpc.Dial(*addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)

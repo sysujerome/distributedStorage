@@ -50,10 +50,9 @@ func (s *server) Del(ctx context.Context, in *pb.DelRequest) (*pb.DelReply, erro
 }
 
 func main() {
-	fmt.Println("???????????")
 	flag.Parse()
 	rdb = redis.NewClient(&redis.Options{
-		Addr: "192.168.1.128:6379",
+		Addr: "localhost:6379",
 	})
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
 	if err != nil {
@@ -65,5 +64,4 @@ func main() {
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)
 	}
-
 }
