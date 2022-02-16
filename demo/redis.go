@@ -11,7 +11,7 @@ var ctx = context.Background()
 
 func main() {
 	rdb := redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379",
+		Addr:     "192.168.1.128:6379",
 		Password: "", // no password set
 		DB:       0,  // use default DB
 	})
@@ -51,6 +51,19 @@ func main() {
 		panic(err)
 	} else {
 		fmt.Println("jerome", val4)
+	}
+
+	err = rdb.Set(ctx, "jerome", "cliffia", 0).Err()
+	if err != nil {
+		panic(err)
+	}
+	err = rdb.Set(ctx, "a", "cliffia", 0).Err()
+	if err != nil {
+		panic(err)
+	}
+	err = rdb.Set(ctx, "aa", "cliffia", 0).Err()
+	if err != nil {
+		panic(err)
 	}
 	// Output: key value
 	// key2 does not exist
