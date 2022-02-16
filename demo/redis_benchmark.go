@@ -13,6 +13,7 @@ import (
 )
 
 var ctx = context.Background()
+var rdb *redis.Client
 
 func check(e error) {
 	if e != nil {
@@ -25,8 +26,22 @@ func Assert(check bool) {
 	}
 }
 
+func setKey(key string, value string) {
+	res, _ := rdb.Set(ctx, key, value, 0).Result()
+	Assert(res != " OK ")
+}
+
+func getKey(key string) {
+	_, _ = rdb.Get(ctx, key).Result()
+}
+
+func delKey(key string) {
+	_, err := rdb.Del(ctx, key).Result()
+	check(err)
+}
+
 func main() {
-	rdb := redis.NewClient(&redis.Options{
+	rdb = redis.NewClient(&redis.Options{
 		Addr:     "192.168.1.128:6379",
 		Password: "", // no password set
 		DB:       0,  // use default DB
@@ -45,22 +60,19 @@ func main() {
 	for sc.Scan() {
 		operation := strings.Split(sc.Text(), " ")
 		// fmt.Println(operation)
+
 		opt := operation[0]
 		switch opt {
 		case "get":
 			// continue
-			_, _ = rdb.Get(ctx, operation[1]).Result()
+			go getKey(operation[1])
 
 		case "set":
 			// continue
-			res, _ := rdb.Set(ctx, operation[1], operation[2], 0).Result()
-			Assert(res != " OK ")
-			// fmt.Println("\"", res, "\"")
-			// continue
+			go setKey(operation[1], operation[2])
 		case "del":
 			// continue
-			_, err := rdb.Del(ctx, operation[1]).Result()
-			check(err)
+			go delKey(operation[1])
 		}
 		counter++
 	}
