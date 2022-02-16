@@ -18,7 +18,7 @@ type server struct {
 var db map[string]string
 
 var (
-	port = flag.Int("port", 50050, "The server port")
+	port = flag.Int("port", 50051, "The server port")
 )
 
 func (s *server) Get(ctx context.Context, in *pb.GetRequest) (*pb.GetReply, error) {
