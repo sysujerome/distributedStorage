@@ -1,16 +1,11 @@
-module demo
+module server
 
 go 1.17
 
-replace example.com/util => ./util/
-
-replace example.com/util/crc16 => ./util/crc16
-
-replace example.com/kvstore => ./kvstore
+replace example.com/kvstore => ../kvstore
 
 require (
 	example.com/kvstore v0.0.0-00010101000000-000000000000
-	example.com/util v0.0.0-00010101000000-000000000000
 	github.com/go-redis/redis/v8 v8.11.4
 	google.golang.org/grpc v1.44.0
 )

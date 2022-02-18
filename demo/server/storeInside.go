@@ -3,10 +3,10 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"log"
 	"net"
-
+	"time"
+	"fmt"
 	pb "example.com/kvstore"
 	"google.golang.org/grpc"
 )
@@ -17,9 +17,6 @@ type server struct {
 
 var db map[string]string
 
-var (
-	port = flag.Int("port", 50051, "The server port")
-)
 
 func (s *server) Get(ctx context.Context, in *pb.GetRequest) (*pb.GetReply, error) {
 	// log.Printf("Received get key: %v", in.GetKey())
@@ -44,10 +41,25 @@ func (s *server) Del(ctx context.Context, in *pb.DelRequest) (*pb.DelReply, erro
 	return &pb.DelReply{Result: "succeed delete " + in.GetKey()}, nil
 }
 
+
+
 func main() {
 	flag.Parse()
+	port := 0
+	for i := 0; i < 5; i++ {
+		port = 50050 + i
+		go serve(port)
+	}
+	for {
+		fmt.Println(time.Now().Format("15:04:05"))
+		time.Sleep(time.Duration(1)*time.Minute)
+	}
+}
+
+func serve(port int) {
 	db = make(map[string]string)
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
+	
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
@@ -57,4 +69,5 @@ func main() {
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)
 	}
+
 }
