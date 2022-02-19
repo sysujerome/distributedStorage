@@ -1,9 +1,22 @@
 package main
 
+import (
+	"rand"
+)
+
 func check(e error) {
 	if e != nil {
 		panic(e)
 	}
+}
+
+func RandStringRunes(n int) string {
+	b := make([]rune, n)
+	letterRunes := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	for i := range b {
+		b[i] = letterRunes[rand.Intn(len(letterRunes))]
+	}
+	return string(b)
 }
 
 func TestSetGet(t *testing.T) {
