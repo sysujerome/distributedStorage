@@ -18,29 +18,32 @@ type server struct {
 
 var db map[string]string
 var next int
-var []string servers
+
+// var servers []string
 
 func (s *server) Get(ctx context.Context, in *pb.GetRequest) (*pb.GetReply, error) {
 	// log.Printf("Received get key: %v", in.GetKey())
 	value, found := db[in.GetKey()]
 	if !found {
-		return &pb.GetReply{Result: "not fount request: " + in.GetKey()}, nil
+		return &pb.GetReply{Result: "", Status: "Not found!"}, nil
 	}
-	return &pb.GetReply{Result: "succeed! request: " + in.GetKey() + " get: " + value}, nil
+	return &pb.GetReply{Result: value, Status: "OK"}, nil
 }
+
 func (s *server) Set(ctx context.Context, in *pb.SetRequest) (*pb.SetReply, error) {
 	// log.Printf("Received get key: %v", in.GetKey())
 	db[in.GetKey()] = in.GetValue()
-	return &pb.SetReply{Result: "succeed insert " + in.GetKey() + " " + in.GetValue()}, nil
+	return &pb.SetReply{Status: "OK"}, nil
 }
+
 func (s *server) Del(ctx context.Context, in *pb.DelRequest) (*pb.DelReply, error) {
 	// log.Printf("Received get key: %v", in.GetKey())
 	delete(db, in.GetKey())
 	_, found := db[in.GetKey()]
 	if found {
-		log.Fatal("del %v failed: ", in.GetKey())
+		return &pb.DelReply{Err: "failed"}, nil
 	}
-	return &pb.DelReply{Result: "succeed delete " + in.GetKey()}, nil
+	return &pb.DelReply{Result: 1, Status: "OK"}, nil
 }
 
 func main() {
