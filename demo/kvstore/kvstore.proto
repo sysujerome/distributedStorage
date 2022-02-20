@@ -8,6 +8,8 @@ service Storage {
     rpc Set(SetRequest) returns (SetReply) {}
     rpc Get(GetRequest) returns (GetReply) {}
     rpc Del(DelRequest) returns (DelReply) {}
+    rpc Split(SplitRequest) returns (SplitReply) {}
+    rpc Scan(ScanRequest) returns (ScanReply) {}
 }
 
 message SetRequest {
@@ -39,4 +41,24 @@ message DelReply {
     string err = 1;
     string Status = 2;
     int32 result = 3;
+}
+
+message SplitRequest {
+    int32 port = 1;
+}
+
+message SplitReply {
+    string err = 1;
+    string Status = 2;
+    int32 result = 3;
+}
+
+message ScanRequest {
+    int32 port = 1;
+}
+
+message ScanReply {
+    string err = 1;
+    string Status = 2;
+    string result = 3;
 }

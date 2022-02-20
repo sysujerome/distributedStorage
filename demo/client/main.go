@@ -27,11 +27,11 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
 	pb "example.com/kvstore"
-	"example.com/util/crc16"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -43,13 +43,9 @@ var (
 func main() {
 	flag.Parse()
 	// Set up a connection to the server.
-	conns := make([]*grpc.ClientConn, 5)
-	for i := 0; i < 5; i++ {
-		var err error
-		port := 50050 + i
-		conns[i], err = grpc.Dial(*addr+fmt.Sprintf(":%d", port), grpc.WithTransportCredentials(insecure.NewCredentials()))
-		check(err)
-	}
+	conn, err := grpc.Dial(*addr+fmt.Sprintf(":%v", os.Args[1]), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	defer conn.Close()
+	check(err)
 	currentPath, err := os.Getwd()
 	check(err)
 	filename := filepath.Join(currentPath, "data/benchmark_data")
@@ -66,18 +62,18 @@ func main() {
 	for sc.Scan() {
 		operation := strings.Split(sc.Text(), " ")
 		// fmt.Println(operation)
-		index := crc16.Checksum([]byte(operation[0]), crc16.IBMTable) % 5
+		// index := crc16.Checksum([]byte(operation[0]), crc16.IBMTable) % 5
 		// wg.Add(1)
-		getServe(operation, conns[index])
+		getServe(operation, conn)
 		counter++
 	}
 	duration := time.Since(start)
 	fmt.Printf("dealing with %d operations took %v Seconds\n", counter, duration.Seconds())
 
 	// wg.Wait()
-	for i := 0; i < 5; i++ {
-		conns[i].Close()
-	}
+	// for i := 0; i < 5; i++ {
+	// 	conns[i].Close()
+	// }
 }
 
 func check(e error) {
@@ -99,17 +95,25 @@ func getServe(operation []string, conn *grpc.ClientConn) {
 	switch opt {
 	case "get":
 		// continue
-		_, err := c.Get(ctx, &pb.GetRequest{Key: operation[1]})
+		reply, err := c.Get(ctx, &pb.GetRequest{Key: operation[1]})
 		check(err)
+		fmt.Println(reply.GetStatus())
 	case "set":
 		// continue
 		reply, err := c.Set(ctx, &pb.SetRequest{Key: operation[1], Value: operation[2]})
 		check(err)
-		// fmt.Println(reply)
-		fmt.Printf("%s\"\n", reply.GetStatus())
+		fmt.Println(reply.GetStatus())
+		// fmt.Printf("%s\"\n", reply.GetStatus())
 	case "del":
 		// continue
-		_, err := c.Del(ctx, &pb.DelRequest{Key: operation[1]})
+		reply, err := c.Del(ctx, &pb.DelRequest{Key: operation[1]})
 		check(err)
+		fmt.Println(reply.GetStatus())
+	case "split":
+		port, err := strconv.Atoi(operation[1])
+		reply, err := c.Split(ctx, &pb.SplitRequest{Port: int32(port)})
+		check(err)
+		fmt.Println(reply.GetResult())
 	}
+
 }
