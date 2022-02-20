@@ -18,7 +18,7 @@ message SetRequest {
 message SetReply {
     string err = 1;
     string Status = 2;
-    string res = 3;
+    string result = 3;
 }
 
 message GetRequest {
@@ -38,5 +38,5 @@ message DelRequest {
 message DelReply {
     string err = 1;
     string Status = 2;
-    string result = 3;
+    int32 result = 3;
 }

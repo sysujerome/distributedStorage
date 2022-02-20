@@ -103,8 +103,10 @@ func getServe(operation []string, conn *grpc.ClientConn) {
 		check(err)
 	case "set":
 		// continue
-		_, err := c.Set(ctx, &pb.SetRequest{Key: operation[1], Value: operation[2]})
+		reply, err := c.Set(ctx, &pb.SetRequest{Key: operation[1], Value: operation[2]})
 		check(err)
+		// fmt.Println(reply)
+		fmt.Printf("%s\"\n", reply.GetStatus())
 	case "del":
 		// continue
 		_, err := c.Del(ctx, &pb.DelRequest{Key: operation[1]})
