@@ -6,54 +6,88 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
+	"strconv"
 	"time"
 
 	pb "example.com/kvstore"
+	"example.com/util/crc16"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 type server struct {
 	pb.UnimplementedStorageServer
 }
 
-var db map[string]string
-var next int
-var []string servers
+var (
+	db   map[string]string
+	next int
+	port int
+)
+
+// var servers []string
 
 func (s *server) Get(ctx context.Context, in *pb.GetRequest) (*pb.GetReply, error) {
 	// log.Printf("Received get key: %v", in.GetKey())
 	value, found := db[in.GetKey()]
 	if !found {
-		return &pb.GetReply{Result: "not fount request: " + in.GetKey()}, nil
+		return &pb.GetReply{Result: "", Status: "Not found!"}, nil
 	}
-	return &pb.GetReply{Result: "succeed! request: " + in.GetKey() + " get: " + value}, nil
+	return &pb.GetReply{Result: value, Status: "OK"}, nil
 }
+
 func (s *server) Set(ctx context.Context, in *pb.SetRequest) (*pb.SetReply, error) {
 	// log.Printf("Received get key: %v", in.GetKey())
 	db[in.GetKey()] = in.GetValue()
-	return &pb.SetReply{Result: "succeed insert " + in.GetKey() + " " + in.GetValue()}, nil
+	return &pb.SetReply{Status: "OK"}, nil
 }
+
 func (s *server) Del(ctx context.Context, in *pb.DelRequest) (*pb.DelReply, error) {
 	// log.Printf("Received get key: %v", in.GetKey())
 	delete(db, in.GetKey())
 	_, found := db[in.GetKey()]
 	if found {
-		log.Fatal("del %v failed: ", in.GetKey())
+		return &pb.DelReply{Err: "failed"}, nil
 	}
-	return &pb.DelReply{Result: "succeed delete " + in.GetKey()}, nil
+	return &pb.DelReply{Result: 1, Status: "OK"}, nil
+}
+
+func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply, error) {
+	// log.Printf("Received get key: %v", in.GetKey())
+	addr := "192.168.1.128:" + fmt.Sprintf(":%d", in.GetPort())
+	log.Println(addr)
+	count := split(addr)
+	return &pb.SplitReply{Status: "OK", Result: count}, nil
+}
+
+// func (c *storageClient) Scan(ctx context.Context, in *ScanRequest, opts ...grpc.CallOption) (*ScanReply, error)
+func (s *server) Scan(ctx context.Context, in *pb.ScanRequest) (*pb.ScanReply, error) {
+	// log.Printf("Received get key: %v", in.GetKey())
+	// addr := "192.168.1.128:" + fmt.Sprintf(":%d", in.GetPort())
+	// log.Println(addr)
+	result := ""
+	count := 0
+	for key, value := range db {
+		result += key + ":" + value + "\n"
+		count++
+	}
+	result = strconv.Itoa(count) + "\n" + result
+	result = "OK" + result
+	return &pb.ScanReply{Status: "OK", Result: result}, nil
+}
+
+func check(e error) {
+	if e != nil {
+		panic(e)
+	}
 }
 
 func main() {
 	flag.Parse()
-	port := 0
-	for i := 0; i < 5; i++ {
-		port = 50050 + i
-		go serve(port)
-	}
-	for {
-		fmt.Println(time.Now().Format("15:04:05"))
-		time.Sleep(time.Duration(1) * time.Minute)
-	}
+	port, err := strconv.Atoi(os.Args[1])
+	check(err)
+	serve(port)
 }
 
 func serve(port int) {
@@ -71,6 +105,24 @@ func serve(port int) {
 	}
 }
 
-func split() {
+func split(target string) int32 {
+	conn, err := grpc.Dial(target, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	check(err)
+	c := pb.NewStorageClient(conn)
+	// Contact the server and print out its response.
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
+	defer cancel()
 
+	count := 0
+	for key, value := range db {
+		if crc16.Checksum([]byte(key), crc16.IBMTable)%2 == 1 { // 待修改
+			delete(db, key)
+		}
+		reply1, _ := c.Set(ctx, &pb.SetRequest{Key: key, Value: value})
+		if reply1.GetStatus() != "OK" {
+			panic(reply1.GetStatus())
+		}
+		count++
+	}
+	return int32(count)
 }

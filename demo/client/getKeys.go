@@ -20,14 +20,11 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"flag"
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
-	"strings"
 	"time"
 
 	pb "example.com/kvstore"
@@ -45,27 +42,22 @@ func main() {
 	conn, err := grpc.Dial(*addr+fmt.Sprintf(":%v", os.Args[1]), grpc.WithTransportCredentials(insecure.NewCredentials()))
 	defer conn.Close()
 	check(err)
-	currentPath, err := os.Getwd()
-	check(err)
-	filename := filepath.Join(currentPath, "data/benchmark_data")
-	f, err := os.Open(filename)
-	check(err)
-	defer f.Close()
-
-	sc := bufio.NewScanner(f)
 	// data := make([][]string, 0)
 	counter := 0
 
 	// var wg sync.WaitGroup
 	start := time.Now()
-	for sc.Scan() {
-		operation := strings.Split(sc.Text(), " ")
-		// fmt.Println(operation)
-		// index := crc16.Checksum([]byte(operation[0]), crc16.IBMTable) % 5
-		// wg.Add(1)
-		getServe(operation, conn)
-		counter++
-	}
+
+	// Contact the server and print out its response.
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
+	defer cancel()
+	c := pb.NewStorageClient(conn)
+	reply, _ := c.Get(ctx, &pb.GetRequest{Key: "saa"})
+	fmt.Printf("%v", reply.GetStatus())
+	// log.Fatal(reply.GetResult())
+	result, err := c.Scan(ctx, &pb.ScanRequest{Port: 50051})
+	check(err)
+	fmt.Printf("%v", result)
 	duration := time.Since(start)
 	fmt.Printf("dealing with %d operations took %v Seconds\n", counter, duration.Seconds())
 
@@ -79,38 +71,4 @@ func check(e error) {
 	if e != nil {
 		log.Fatal(e)
 	}
-}
-
-func getServe(operation []string, conn *grpc.ClientConn) {
-	// defer wg.Done()
-
-	c := pb.NewStorageClient(conn)
-
-	// Contact the server and print out its response.
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
-	defer cancel()
-
-	// opt := operation[0]
-	// switch opt {
-	// case "get":
-	// 	// continue
-	// 	_, err := c.Get(ctx, &pb.GetRequest{Key: operation[1]})
-	// 	check(err)
-	// case "set":
-	// 	// continue
-	// 	reply, err := c.Set(ctx, &pb.SetRequest{Key: operation[1], Value: operation[2]})
-	// 	check(err)
-	// 	// fmt.Println(reply)
-	// 	fmt.Printf("%s\"\n", reply.GetStatus())
-	// case "del":
-	// 	// continue
-	// 	_, err := c.Del(ctx, &pb.DelRequest{Key: operation[1]})
-	// 	check(err)
-	// case "split":
-	// 	port, err := strconv.Atoi(operation[1])
-	// 	_, err = c.Split(ctx, &pb.SplitRequest{Port: int32(port)})
-	// 	check(err)
-	// }
-	result, _ := c.Scan(ctx, &pb.ScanRequest{Port: 50050})
-	fmt.Printf("%v\n", result.GetResult())
 }
