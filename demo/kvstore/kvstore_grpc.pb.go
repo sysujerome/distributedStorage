@@ -21,6 +21,8 @@ type StorageClient interface {
 	Set(ctx context.Context, in *SetRequest, opts ...grpc.CallOption) (*SetReply, error)
 	Get(ctx context.Context, in *GetRequest, opts ...grpc.CallOption) (*GetReply, error)
 	Del(ctx context.Context, in *DelRequest, opts ...grpc.CallOption) (*DelReply, error)
+	Split(ctx context.Context, in *SplitRequest, opts ...grpc.CallOption) (*SplitReply, error)
+	Scan(ctx context.Context, in *ScanRequest, opts ...grpc.CallOption) (*ScanReply, error)
 }
 
 type storageClient struct {
@@ -58,6 +60,24 @@ func (c *storageClient) Del(ctx context.Context, in *DelRequest, opts ...grpc.Ca
 	return out, nil
 }
 
+func (c *storageClient) Split(ctx context.Context, in *SplitRequest, opts ...grpc.CallOption) (*SplitReply, error) {
+	out := new(SplitReply)
+	err := c.cc.Invoke(ctx, "/kvstore.Storage/Split", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *storageClient) Scan(ctx context.Context, in *ScanRequest, opts ...grpc.CallOption) (*ScanReply, error) {
+	out := new(ScanReply)
+	err := c.cc.Invoke(ctx, "/kvstore.Storage/Scan", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // StorageServer is the server API for Storage service.
 // All implementations must embed UnimplementedStorageServer
 // for forward compatibility
@@ -65,6 +85,8 @@ type StorageServer interface {
 	Set(context.Context, *SetRequest) (*SetReply, error)
 	Get(context.Context, *GetRequest) (*GetReply, error)
 	Del(context.Context, *DelRequest) (*DelReply, error)
+	Split(context.Context, *SplitRequest) (*SplitReply, error)
+	Scan(context.Context, *ScanRequest) (*ScanReply, error)
 	mustEmbedUnimplementedStorageServer()
 }
 
@@ -80,6 +102,12 @@ func (UnimplementedStorageServer) Get(context.Context, *GetRequest) (*GetReply, 
 }
 func (UnimplementedStorageServer) Del(context.Context, *DelRequest) (*DelReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Del not implemented")
+}
+func (UnimplementedStorageServer) Split(context.Context, *SplitRequest) (*SplitReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Split not implemented")
+}
+func (UnimplementedStorageServer) Scan(context.Context, *ScanRequest) (*ScanReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Scan not implemented")
 }
 func (UnimplementedStorageServer) mustEmbedUnimplementedStorageServer() {}
 
@@ -148,6 +176,42 @@ func _Storage_Del_Handler(srv interface{}, ctx context.Context, dec func(interfa
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Storage_Split_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SplitRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StorageServer).Split(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/kvstore.Storage/Split",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StorageServer).Split(ctx, req.(*SplitRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Storage_Scan_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ScanRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StorageServer).Scan(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/kvstore.Storage/Scan",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StorageServer).Scan(ctx, req.(*ScanRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Storage_ServiceDesc is the grpc.ServiceDesc for Storage service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -166,6 +230,14 @@ var Storage_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Del",
 			Handler:    _Storage_Del_Handler,
+		},
+		{
+			MethodName: "Split",
+			Handler:    _Storage_Split_Handler,
+		},
+		{
+			MethodName: "Scan",
+			Handler:    _Storage_Scan_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
