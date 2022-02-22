@@ -57,7 +57,7 @@ func main() {
 	// log.Fatal(reply.GetResult())
 	result, err := c.Scan(ctx, &pb.ScanRequest{Port: 50051})
 	check(err)
-	fmt.Printf("%v", result.GetResult())
+	fmt.Printf("%v", result)
 	duration := time.Since(start)
 	fmt.Printf("dealing with %d operations took %v Seconds\n", counter, duration.Seconds())
 
