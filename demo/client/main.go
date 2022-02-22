@@ -27,6 +27,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -90,6 +91,7 @@ func getServe(operation []string, conn *grpc.ClientConn) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
 	defer cancel()
 
+<<<<<<< HEAD
 	// opt := operation[0]
 	// switch opt {
 	// case "get":
@@ -113,4 +115,31 @@ func getServe(operation []string, conn *grpc.ClientConn) {
 	// }
 	result, _ := c.Scan(ctx, &pb.ScanRequest{Port: 50050})
 	fmt.Printf("%v\n", result.GetResult())
+=======
+	opt := operation[0]
+	switch opt {
+	case "get":
+		// continue
+		reply, err := c.Get(ctx, &pb.GetRequest{Key: operation[1]})
+		check(err)
+		fmt.Println(reply.GetStatus())
+	case "set":
+		// continue
+		reply, err := c.Set(ctx, &pb.SetRequest{Key: operation[1], Value: operation[2]})
+		check(err)
+		fmt.Println(reply.GetStatus())
+		// fmt.Printf("%s\"\n", reply.GetStatus())
+	case "del":
+		// continue
+		reply, err := c.Del(ctx, &pb.DelRequest{Key: operation[1]})
+		check(err)
+		fmt.Println(reply.GetStatus())
+	case "split":
+		port, err := strconv.Atoi(operation[1])
+		reply, err := c.Split(ctx, &pb.SplitRequest{Port: int32(port)})
+		check(err)
+		fmt.Println(reply.GetResult())
+	}
+
+>>>>>>> fc0725dacffe25c0451217af40c253a07a398645
 }
