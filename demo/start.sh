@@ -67,14 +67,14 @@ fi
 # sleep 1s
 
 go build -o kvserver ./server/main.go
-./server --shard_node_name=shard_node_0 &
-./server --shard_node_name=shard_node_1 &
-./server --shard_node_name=shard_node_2 &
-./server --shard_node_name=shard_node_3 &
-./server --shard_node_name=shard_node_4 &
-./server --shard_node_name=shard_node_5 &
-./server --shard_node_name=shard_node_6 &
-./server --shard_node_name=shard_node_7 &
+./kvserver --shard_node_name=shard_node_0 &
+./kvserver --shard_node_name=shard_node_1 &
+./kvserver --shard_node_name=shard_node_2 &
+./kvserver --shard_node_name=shard_node_3 &
+./kvserver --shard_node_name=shard_node_4 &
+./kvserver --shard_node_name=shard_node_5 &
+./kvserver --shard_node_name=shard_node_6 &
+./kvserver --shard_node_name=shard_node_7 &
 
 go build -o cli client/main.go
 ./cli 50050

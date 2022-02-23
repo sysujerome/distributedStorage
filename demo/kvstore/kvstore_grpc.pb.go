@@ -23,6 +23,7 @@ type StorageClient interface {
 	Del(ctx context.Context, in *DelRequest, opts ...grpc.CallOption) (*DelReply, error)
 	Split(ctx context.Context, in *SplitRequest, opts ...grpc.CallOption) (*SplitReply, error)
 	Scan(ctx context.Context, in *ScanRequest, opts ...grpc.CallOption) (*ScanReply, error)
+	SyncConf(ctx context.Context, in *SyncReqest, opts ...grpc.CallOption) (*SyncReply, error)
 }
 
 type storageClient struct {
@@ -78,6 +79,15 @@ func (c *storageClient) Scan(ctx context.Context, in *ScanRequest, opts ...grpc.
 	return out, nil
 }
 
+func (c *storageClient) SyncConf(ctx context.Context, in *SyncReqest, opts ...grpc.CallOption) (*SyncReply, error) {
+	out := new(SyncReply)
+	err := c.cc.Invoke(ctx, "/kvstore.Storage/SyncConf", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // StorageServer is the server API for Storage service.
 // All implementations must embed UnimplementedStorageServer
 // for forward compatibility
@@ -87,6 +97,7 @@ type StorageServer interface {
 	Del(context.Context, *DelRequest) (*DelReply, error)
 	Split(context.Context, *SplitRequest) (*SplitReply, error)
 	Scan(context.Context, *ScanRequest) (*ScanReply, error)
+	SyncConf(context.Context, *SyncReqest) (*SyncReply, error)
 	mustEmbedUnimplementedStorageServer()
 }
 
@@ -108,6 +119,9 @@ func (UnimplementedStorageServer) Split(context.Context, *SplitRequest) (*SplitR
 }
 func (UnimplementedStorageServer) Scan(context.Context, *ScanRequest) (*ScanReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Scan not implemented")
+}
+func (UnimplementedStorageServer) SyncConf(context.Context, *SyncReqest) (*SyncReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SyncConf not implemented")
 }
 func (UnimplementedStorageServer) mustEmbedUnimplementedStorageServer() {}
 
@@ -212,6 +226,24 @@ func _Storage_Scan_Handler(srv interface{}, ctx context.Context, dec func(interf
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Storage_SyncConf_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SyncReqest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StorageServer).SyncConf(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/kvstore.Storage/SyncConf",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StorageServer).SyncConf(ctx, req.(*SyncReqest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Storage_ServiceDesc is the grpc.ServiceDesc for Storage service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -238,6 +270,10 @@ var Storage_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Scan",
 			Handler:    _Storage_Scan_Handler,
+		},
+		{
+			MethodName: "SyncConf",
+			Handler:    _Storage_SyncConf_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
