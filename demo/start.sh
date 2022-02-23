@@ -66,6 +66,19 @@ fi
 
 # sleep 1s
 
-ps -ef | grep redis-server | grep -v grep | awk '{print $2}' | xargs kill -9 &> /dev/null &
-ps -ef | grep storeInside | grep -v grep | awk '{print $2}' | xargs kill -9 &> /dev/null &
-ps -ef | grep storeInRedis | grep -v grep | awk '{print $2}' | xargs kill -9 &> /dev/null &
+go build -o kvserver ./server/main.go
+./server --shard_node_name=shard_node_0 &
+./server --shard_node_name=shard_node_1 &
+./server --shard_node_name=shard_node_2 &
+./server --shard_node_name=shard_node_3 &
+./server --shard_node_name=shard_node_4 &
+./server --shard_node_name=shard_node_5 &
+./server --shard_node_name=shard_node_6 &
+./server --shard_node_name=shard_node_7 &
+
+go build -o cli client/main.go
+./cli 50050
+
+# ps -ef | grep redis-server | grep -v grep | awk '{print $2}' | xargs kill -9 &> /dev/null &
+# ps -ef | grep storeInside | grep -v grep | awk '{print $2}' | xargs kill -9 &> /dev/null &
+# ps -ef | grep storeInRedis | grep -v grep | awk '{print $2}' | xargs kill -9 &> /dev/null &
