@@ -39,6 +39,7 @@ var (
 	maxSize       = flag.Int("max_size", 8, "the maximum of the count of machine")
 	hashSize      = flag.Int("hash_size", 4, "the initial count of hash number")
 	level         int
+	servers       map[int]string
 )
 
 // var servers []string
@@ -87,6 +88,13 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 		level++
 	}
 	return &pb.SplitReply{Status: "OK", Result: count}, nil
+}
+
+func (s *server) SyncConf(ctx context.Context, in *pb.SyncRequest) (*pb.SyncReply, error) {
+	*next = in.GetNext
+	level = in.GetLevel
+	syncConf(in.GetBeginLevel)
+	return &pb.SyncReply{Status: "OK"}, nil
 }
 
 // func (c *storageClient) Scan(ctx context.Context, in *ScanRequest, opts ...grpc.CallOption) (*ScanReply, error)
@@ -183,18 +191,60 @@ func initConf() {
 	confs := configure["shard_confs"].([]interface{}) // shard_confs
 	for _, v := range confs {
 		value := v.(map[string]interface{})
-		*shardIdx = int(value["shard_idx"].(float64))
+		index := int(value["shard_idx"].(float64))
 		shard_node_confs := value["shard_node_confs"].(map[string]interface{})
 		shard_content, found := shard_node_confs[*shardNodeName].(map[string]interface{})
 		if found {
 			fmt.Printf("Not found!  %s\n", *shardNodeName)
+			*shardIdx = index
 			*basePort = int(shard_content["base_port"].(float64))
 			*ip = shard_content["ip"].(string)
 			*maxCount = int(shard_content["max_key"].(float64))
-			break
+		}
+		for _, conf := range shard_node_confs {
+			detail := conf.(map[string]interface{})
+			thisIP := detail["ip"].(string)
+			thisPort := detail["base_port"].(float64)
+			address := thisIP + ":" + strconv.Itoa(int(thisPort))
+			servers[index] = address
 		}
 	}
 	level = 0
+}
+
+func syncConf(beginIdx int) { // beginIdx指的是发起同步的node
+	getNextIdx := func(index, max int) int {
+		nextIndex := index + 1
+		if nextIndex == max {
+			nextIndex = 0
+		}
+		return nextIndex
+	}
+	nextIndex := getNextIdx(*shardIdx, len(servers))
+	for {
+		if nextIndex == *shardIdx || nextIndex == beginIdx { //同步到发起节点或者同步到自身则停止
+			return
+		}
+		address := servers[nextIndex]
+		_, err := grpc.Dial(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if err != nil {
+			nextIndex = getNextIdx(nextIndex, len(servers))
+			continue
+		}
+		conn, err := grpc.Dial(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		check(err)
+		c := pb.NewStorageClient(conn)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Hour))
+		defer cancel()
+		reply, err := c.SyncConf(ctx, &pb.SplitRequest{Next: *next, Level: level})
+		check(err)
+		if reply.GetStatus() != "OK" {
+			nextIndex = getNextIdx(nextIndex, len(servers))
+			continue
+		}
+		break
+	}
+
 }
 
 func hashFunc(key string) int {

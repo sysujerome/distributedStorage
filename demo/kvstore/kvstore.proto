@@ -10,6 +10,7 @@ service Storage {
     rpc Del(DelRequest) returns (DelReply) {}
     rpc Split(SplitRequest) returns (SplitReply) {}
     rpc Scan(ScanRequest) returns (ScanReply) {}
+    rpc SyncConf(SyncReqest) returns (SyncReply) {}
 }
 
 message SetRequest {
@@ -58,6 +59,18 @@ message ScanRequest {
 }
 
 message ScanReply {
+    string err = 1;
+    string Status = 2;
+    string result = 3;
+}
+
+message SyncReqest {
+    string next = 1;
+    int32 level = 2;
+    int32 beginLevel = 3;
+}
+
+message SyncReply {
     string err = 1;
     string Status = 2;
     string result = 3;
