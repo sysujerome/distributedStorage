@@ -23,7 +23,7 @@ type StorageClient interface {
 	Del(ctx context.Context, in *DelRequest, opts ...grpc.CallOption) (*DelReply, error)
 	Split(ctx context.Context, in *SplitRequest, opts ...grpc.CallOption) (*SplitReply, error)
 	Scan(ctx context.Context, in *ScanRequest, opts ...grpc.CallOption) (*ScanReply, error)
-	SyncConf(ctx context.Context, in *SyncReqest, opts ...grpc.CallOption) (*SyncReply, error)
+	SyncConf(ctx context.Context, in *SyncRequest, opts ...grpc.CallOption) (*SyncReply, error)
 }
 
 type storageClient struct {
@@ -79,7 +79,7 @@ func (c *storageClient) Scan(ctx context.Context, in *ScanRequest, opts ...grpc.
 	return out, nil
 }
 
-func (c *storageClient) SyncConf(ctx context.Context, in *SyncReqest, opts ...grpc.CallOption) (*SyncReply, error) {
+func (c *storageClient) SyncConf(ctx context.Context, in *SyncRequest, opts ...grpc.CallOption) (*SyncReply, error) {
 	out := new(SyncReply)
 	err := c.cc.Invoke(ctx, "/kvstore.Storage/SyncConf", in, out, opts...)
 	if err != nil {
@@ -97,7 +97,7 @@ type StorageServer interface {
 	Del(context.Context, *DelRequest) (*DelReply, error)
 	Split(context.Context, *SplitRequest) (*SplitReply, error)
 	Scan(context.Context, *ScanRequest) (*ScanReply, error)
-	SyncConf(context.Context, *SyncReqest) (*SyncReply, error)
+	SyncConf(context.Context, *SyncRequest) (*SyncReply, error)
 	mustEmbedUnimplementedStorageServer()
 }
 
@@ -120,7 +120,7 @@ func (UnimplementedStorageServer) Split(context.Context, *SplitRequest) (*SplitR
 func (UnimplementedStorageServer) Scan(context.Context, *ScanRequest) (*ScanReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Scan not implemented")
 }
-func (UnimplementedStorageServer) SyncConf(context.Context, *SyncReqest) (*SyncReply, error) {
+func (UnimplementedStorageServer) SyncConf(context.Context, *SyncRequest) (*SyncReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SyncConf not implemented")
 }
 func (UnimplementedStorageServer) mustEmbedUnimplementedStorageServer() {}
@@ -227,7 +227,7 @@ func _Storage_Scan_Handler(srv interface{}, ctx context.Context, dec func(interf
 }
 
 func _Storage_SyncConf_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(SyncReqest)
+	in := new(SyncRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -239,7 +239,7 @@ func _Storage_SyncConf_Handler(srv interface{}, ctx context.Context, dec func(in
 		FullMethod: "/kvstore.Storage/SyncConf",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(StorageServer).SyncConf(ctx, req.(*SyncReqest))
+		return srv.(StorageServer).SyncConf(ctx, req.(*SyncRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }

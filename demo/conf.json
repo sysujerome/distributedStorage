@@ -93,7 +93,7 @@
         {
             "shard_idx" :8,
             "shard_node_confs" : {
-                "shard_node_5":  {
+                "shard_node_8":  {
                     "ip":"192.168.1.128",
                     "base_port":50058,
                     "status":"free",
