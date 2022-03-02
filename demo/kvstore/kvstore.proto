@@ -10,7 +10,8 @@ service Storage {
     rpc Del(DelRequest) returns (DelReply) {}
     rpc Split(SplitRequest) returns (SplitReply) {}
     rpc Scan(ScanRequest) returns (ScanReply) {}
-    rpc SyncConf(SyncReqest) returns (SyncReply) {}
+    rpc SyncConf(SyncRequest) returns (SyncReply) {}
+    rpc GetConf(ConfRequest) returns (ConfReply) {}
 }
 
 message SetRequest {
@@ -20,7 +21,7 @@ message SetRequest {
 
 message SetReply {
     string err = 1;
-    string Status = 2;
+    string status = 2;
     string result = 3;
 }
 
@@ -30,7 +31,7 @@ message GetRequest {
 
 message GetReply {
     string err = 1;
-    string Status = 2;
+    string status = 2;
     string result = 3;
 }
 
@@ -40,7 +41,7 @@ message DelRequest {
 
 message DelReply {
     string err = 1;
-    string Status = 2;
+    string status = 2;
     int32 result = 3;
 }
 
@@ -50,7 +51,7 @@ message SplitRequest {
 
 message SplitReply {
     string err = 1;
-    string Status = 2;
+    string status = 2;
     int32 result = 3;
 }
 
@@ -60,18 +61,36 @@ message ScanRequest {
 
 message ScanReply {
     string err = 1;
-    string Status = 2;
+    string status = 2;
     string result = 3;
 }
 
-message SyncReqest {
-    string next = 1;
-    int32 level = 2;
-    int32 beginLevel = 3;
+message SyncRequest {
+    int64 next = 1;
+    int64 level = 2;
+    int64 beginLevel = 3;
 }
 
 message SyncReply {
     string err = 1;
-    string Status = 2;
+    string status = 2;
     string result = 3;
+}
+
+message ConfRequest {
+    int64 noname = 1;
+}
+
+message ConfReply {
+    string err = 1;
+    string status = 2;
+    int64 next = 3;
+    int64 level = 4;
+    message Server {
+        required string ip = 1;
+        required int64 port = 2;
+        required string status = 3;
+        required int64 maxKay = 4;  
+    }
+    repeated Server server = 5;
 }

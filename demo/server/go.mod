@@ -3,6 +3,7 @@ module server
 go 1.17
 
 replace example.com/kvstore => ../kvstore
+replace example.com/util/crc16 => ../util/crc16/crc16
 
 require (
 	example.com/kvstore v0.0.0-00010101000000-000000000000

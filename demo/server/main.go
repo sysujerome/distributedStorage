@@ -16,6 +16,7 @@ import (
 	"time"
 
 	pb "example.com/kvstore"
+	// "example.com/util/crc16"
 	crc16 "example.com/util/crc16"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -27,19 +28,21 @@ type server struct {
 
 var (
 	db            map[string]string
-	next          = flag.Int("next", 0, "the spilt node pointer")
-	maxCount      = flag.Int("maxCount", 10000, "the maximum count of the key when to split")
-	curCount      = flag.Int("curCount", 0, "the count of the key at the beginning")
+	next          = flag.Int64("next", 0, "the spilt node point64er")
+	maxCount      = flag.Int64("maxCount", 10000, "the maximum count of the key when to split")
+	curCount      = flag.Int64("curCount", 0, "the count of the key at the beginning")
 	shardNodeName = flag.String("shard_node_name", "shard_node_0", "incade the node name")
-	shardIdx      = flag.Int("shard_idx", 0, "the index of the shard node")
+	shardIdx      = flag.Int64("shard_idx", 0, "the index of the shard node")
 	ip            = flag.String("ip", "192.168.1.128", "indicate the ip of the node")
-	basePort      = flag.Int("base_port", 50050, "indicate the port of the node")
+	basePort      = flag.Int64("base_port", 50050, "indicate the port of the node")
 	conf          = flag.String("conf", "conf.json", "the path of configure file")
-	usingSize     = flag.Int("using_size", 4, "the free machine to add the data of the splitting machine")
-	maxSize       = flag.Int("max_size", 8, "the maximum of the count of machine")
-	hashSize      = flag.Int("hash_size", 4, "the initial count of hash number")
-	level         int
-	servers       map[int]string
+	usingSize     = flag.Int64("using_size", 4, "the free machine to add the data of the splitting machine")
+	maxSize       = flag.Int64("max_size", 8, "the maximum of the count of machine")
+	hashSize      = flag.Int64("hash_size", 4, "the initial count of hash number")
+	level         = flag.Int64("level", 4, "the initial level of hash function")
+	servers       map[int64]string
+	maxKey        map[int64]int64
+	status        map[int64]int64
 )
 
 // var servers []string
@@ -76,24 +79,24 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 	// log.Printf("Received get key: %v", in.GetKey())
 	if *usingSize >= *maxSize {
 		*next = *maxSize
-		return &pb.SplitReply{Status: "failed", Result: "0", Err: "the count of machine using haved fulled!"}, nil
+		return &pb.SplitReply{Status: "failed", Result: 0, Err: "the count of machine using haved fulled!"}, nil
 	}
 	addr := "192.168.1.128" + fmt.Sprintf(":%d", *basePort+*usingSize)
 	*usingSize++
 	log.Println(addr)
 	count := split(addr)
 	*next++
-	if *next == int(math.Pow(2, float64(level)))**hashSize {
+	if *next == int64(math.Pow(2, float64(*level)))**hashSize {
 		*next = 0
-		level++
+		*level++
 	}
 	return &pb.SplitReply{Status: "OK", Result: count}, nil
 }
 
 func (s *server) SyncConf(ctx context.Context, in *pb.SyncRequest) (*pb.SyncReply, error) {
-	*next = in.GetNext
-	level = in.GetLevel
-	syncConf(in.GetBeginLevel)
+	*next = in.GetNext()
+	*level = in.GetLevel()
+	syncConf(in.GetBeginLevel())
 	return &pb.SyncReply{Status: "OK"}, nil
 }
 
@@ -126,6 +129,7 @@ func main() {
 
 func printConf() {
 	fmt.Printf("db              %s\n", db)
+	fmt.Printf("servers         %s\n", servers)
 	fmt.Printf("next            %d\n", *next)
 	fmt.Printf("maxCount        %d\n", *maxCount)
 	fmt.Printf("curCount        %d\n", *curCount)
@@ -136,7 +140,7 @@ func printConf() {
 	fmt.Printf("conf            %s\n", *conf)
 }
 
-func serve(port int) {
+func serve(port int64) {
 	db = make(map[string]string)
 
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
@@ -176,6 +180,8 @@ func split(target string) int32 {
 
 func initConf() {
 	flag.Parse()
+	db = make(map[string]string)
+	servers = make(map[int64]string)
 	fmt.Printf("%s\n", *shardNodeName)
 	defer flag.Parse()
 	curPath, err := os.Getwd()
@@ -191,15 +197,14 @@ func initConf() {
 	confs := configure["shard_confs"].([]interface{}) // shard_confs
 	for _, v := range confs {
 		value := v.(map[string]interface{})
-		index := int(value["shard_idx"].(float64))
+		index := int64(value["shard_idx"].(float64))
 		shard_node_confs := value["shard_node_confs"].(map[string]interface{})
 		shard_content, found := shard_node_confs[*shardNodeName].(map[string]interface{})
 		if found {
-			fmt.Printf("Not found!  %s\n", *shardNodeName)
 			*shardIdx = index
-			*basePort = int(shard_content["base_port"].(float64))
+			*basePort = int64(shard_content["base_port"].(float64))
 			*ip = shard_content["ip"].(string)
-			*maxCount = int(shard_content["max_key"].(float64))
+			*maxCount = int64(shard_content["max_key"].(float64))
 		}
 		for _, conf := range shard_node_confs {
 			detail := conf.(map[string]interface{})
@@ -209,13 +214,13 @@ func initConf() {
 			servers[index] = address
 		}
 	}
-	level = 0
+	*level = 0
 }
 
-func syncConf(beginIdx int) { // beginIdx指的是发起同步的node
-	getNextIdx := func(index, max int) int {
+func syncConf(beginIdx int64) { // beginIdx指的是发起同步的node
+	getNextIdx := func(index int64, max int) int64 {
 		nextIndex := index + 1
-		if nextIndex == max {
+		if nextIndex == int64(max) {
 			nextIndex = 0
 		}
 		return nextIndex
@@ -236,7 +241,7 @@ func syncConf(beginIdx int) { // beginIdx指的是发起同步的node
 		c := pb.NewStorageClient(conn)
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Hour))
 		defer cancel()
-		reply, err := c.SyncConf(ctx, &pb.SplitRequest{Next: *next, Level: level})
+		reply, err := c.SyncConf(ctx, &pb.SyncRequest{Next: *next, Level: *level})
 		check(err)
 		if reply.GetStatus() != "OK" {
 			nextIndex = getNextIdx(nextIndex, len(servers))
@@ -247,11 +252,11 @@ func syncConf(beginIdx int) { // beginIdx指的是发起同步的node
 
 }
 
-func hashFunc(key string) int {
-	posCRC16 := crc16.Checksum([]byte(key), crc16.IBMTable)
-	pos := posCRC16 % (int(math.Pow(2.0, float64(level))) * *hashSize)
-	if pos < next { // 分裂过了的
-		pos = posCRC16 % (int(math.Pow(2.0, float64(level+1))) * *hashSize)
+func hashFunc(key string) int64 {
+	posCRC16 := int64(crc16.Checksum([]byte(key), crc16.IBMTable))
+	pos := posCRC16 % (int64(math.Pow(2.0, float64(*level))) * *hashSize)
+	if pos < *next { // 分裂过了的
+		pos = posCRC16 % (int64(math.Pow(2.0, float64(*level+1))) * *hashSize)
 	}
 	return pos
 }
