@@ -1,113 +1,69 @@
-2022/03/01 17:34:56 failed to listen: listen tcp 192.168.1.128:50050: bind: address already in use
 
-20220301174230
-2022/03/01 17:42:31 server listening at 192.168.1.128:50051
-2022/03/01 17:42:31 server listening at 192.168.1.128:50052
-2022/03/01 17:42:31 server listening at 192.168.1.128:50050
-2022/03/01 17:42:31 server listening at 192.168.1.128:50055
-2022/03/01 17:42:31 server listening at 192.168.1.128:50056
-2022/03/01 17:42:31 server listening at 192.168.1.128:50057
-2022/03/01 17:42:31 server listening at 192.168.1.128:50053
-2022/03/01 17:42:31 server listening at 192.168.1.128:50054
-2022/03/01 17:42:31 server listening at 192.168.1.128:50058
-
-
-2022/03/01 17:44:24 server listening at 192.168.1.128:50050
-2022/03/01 17:44:24 server listening at 192.168.1.128:50052
-2022/03/01 17:44:24 server listening at 192.168.1.128:50051
-2022/03/01 17:44:24 server listening at 192.168.1.128:50057
-2022/03/01 17:44:24 server listening at 192.168.1.128:50058
-2022/03/01 17:44:24 server listening at 192.168.1.128:50056
-2022/03/01 17:44:24 server listening at 192.168.1.128:50054
-2022/03/01 17:44:24 server listening at 192.168.1.128:50053
-2022/03/01 17:44:24 server listening at 192.168.1.128:50055
-
-2022/03/01 17:49:18
-2022/03/01 17:49:19 server listening at 192.168.1.128:50051
-2022/03/01 17:49:19 server listening at 192.168.1.128:50052
-2022/03/01 17:49:19 server listening at 192.168.1.128:50050
-2022/03/01 17:49:19 server listening at 192.168.1.128:50057
-2022/03/01 17:49:19 server listening at 192.168.1.128:50056
-2022/03/01 17:49:19 server listening at 192.168.1.128:50055
-2022/03/01 17:49:19 server listening at 192.168.1.128:50053
-2022/03/01 17:49:19 server listening at 192.168.1.128:50058
-2022/03/01 17:49:19 server listening at 192.168.1.128:50054
-
-2022/03/01 18:37:30
-2022/03/01 18:37:32 server listening at 192.168.1.128:50050
-2022/03/01 18:37:32 server listening at 192.168.1.128:50052
-2022/03/01 18:37:32 server listening at 192.168.1.128:50054
-2022/03/01 18:37:32 server listening at 192.168.1.128:50056
-2022/03/01 18:37:32 server listening at 192.168.1.128:50058
-2022/03/01 18:37:32 server listening at 192.168.1.128:50057
-2022/03/01 18:37:32 server listening at 192.168.1.128:50055
-2022/03/01 18:37:32 server listening at 192.168.1.128:50053
-2022/03/01 18:37:32 server listening at 192.168.1.128:50051
-
-2022/03/01 18:38:49
-2022/03/01 18:38:50 server listening at 192.168.1.128:50052
-2022/03/01 18:38:50 server listening at 192.168.1.128:50050
-2022/03/01 18:38:50 server listening at 192.168.1.128:50051
-2022/03/01 18:38:50 server listening at 192.168.1.128:50058
-2022/03/01 18:38:50 server listening at 192.168.1.128:50056
-2022/03/01 18:38:50 server listening at 192.168.1.128:50057
-2022/03/01 18:38:50 server listening at 192.168.1.128:50053
-2022/03/01 18:38:50 server listening at 192.168.1.128:50055
-2022/03/01 18:38:50 server listening at 192.168.1.128:50054
-
-2022/03/02 09:44:15
-2022/03/02 09:44:16 server listening at 192.168.1.128:50050
-2022/03/02 09:44:16 server listening at 192.168.1.128:50052
-2022/03/02 09:44:16 server listening at 192.168.1.128:50058
-2022/03/02 09:44:16 server listening at 192.168.1.128:50056
-2022/03/02 09:44:16 server listening at 192.168.1.128:50051
-2022/03/02 09:44:16 server listening at 192.168.1.128:50054
-2022/03/02 09:44:16 server listening at 192.168.1.128:50055
-2022/03/02 09:44:16 server listening at 192.168.1.128:50057
-2022/03/02 09:44:16 server listening at 192.168.1.128:50053
-
-2022/03/02 09:44:48
-2022/03/02 09:44:48 server listening at 192.168.1.128:50051
-2022/03/02 09:44:48 server listening at 192.168.1.128:50050
-2022/03/02 09:44:48 server listening at 192.168.1.128:50055
-2022/03/02 09:44:48 server listening at 192.168.1.128:50057
-2022/03/02 09:44:48 server listening at 192.168.1.128:50058
-2022/03/02 09:44:48 server listening at 192.168.1.128:50056
-2022/03/02 09:44:48 server listening at 192.168.1.128:50054
-2022/03/02 09:44:48 server listening at 192.168.1.128:50053
-2022/03/02 09:44:48 server listening at 192.168.1.128:50052
-
-2022/03/02 09:45:31
-2022/03/02 09:45:32 server listening at 192.168.1.128:50050
-2022/03/02 09:45:32 server listening at 192.168.1.128:50051
-2022/03/02 09:45:32 server listening at 192.168.1.128:50052
-2022/03/02 09:45:32 server listening at 192.168.1.128:50056
-2022/03/02 09:45:32 server listening at 192.168.1.128:50055
-2022/03/02 09:45:32 server listening at 192.168.1.128:50057
-2022/03/02 09:45:32 server listening at 192.168.1.128:50053
-2022/03/02 09:45:32 server listening at 192.168.1.128:50054
-2022/03/02 09:45:32 server listening at 192.168.1.128:50058
-
-2022/03/02 09:45:43
-2022/03/02 09:45:44 server listening at 192.168.1.128:50052
-2022/03/02 09:45:44 server listening at 192.168.1.128:50050
-2022/03/02 09:45:44 server listening at 192.168.1.128:50051
-2022/03/02 09:45:44 server listening at 192.168.1.128:50058
-2022/03/02 09:45:44 server listening at 192.168.1.128:50055
-2022/03/02 09:45:44 server listening at 192.168.1.128:50057
-2022/03/02 09:45:44 server listening at 192.168.1.128:50056
-2022/03/02 09:45:44 server listening at 192.168.1.128:50054
-2022/03/02 09:45:44 server listening at 192.168.1.128:50053
+2022/03/05 20:36:18
 ---------
+2022/03/05 20:36:18 server listening at 192.168.1.128:50058
+2022/03/05 20:36:18 server listening at 192.168.1.128:50051
+2022/03/05 20:36:18 server listening at 192.168.1.128:50057
+2022/03/05 20:36:18 server listening at 192.168.1.128:50050
+2022/03/05 20:36:18 server listening at 192.168.1.128:50054
+2022/03/05 20:36:18 server listening at 192.168.1.128:50055
+2022/03/05 20:36:18 server listening at 192.168.1.128:50053
+2022/03/05 20:36:18 server listening at 192.168.1.128:50056
+2022/03/05 20:36:18 server listening at 192.168.1.128:50052
 
-2022/03/02 09:54:50
-2022/03/02 09:54:51 server listening at 192.168.1.128:50052
-2022/03/02 09:54:51 server listening at 192.168.1.128:50050
-2022/03/02 09:54:51 server listening at 192.168.1.128:50051
-2022/03/02 09:54:51 server listening at 192.168.1.128:50057
-2022/03/02 09:54:51 server listening at 192.168.1.128:50056
-2022/03/02 09:54:51 server listening at 192.168.1.128:50058
-2022/03/02 09:54:51 server listening at 192.168.1.128:50055
-2022/03/02 09:54:51 server listening at 192.168.1.128:50053
-2022/03/02 09:54:51 server listening at 192.168.1.128:50054
+2022/03/05 20:37:09
 ---------
+2022/03/05 20:37:09 server listening at 192.168.1.128:50050
+2022/03/05 20:37:09 server listening at 192.168.1.128:50051
+2022/03/05 20:37:09 server listening at 192.168.1.128:50053
+2022/03/05 20:37:09 server listening at 192.168.1.128:50052
+2022/03/05 20:37:09 server listening at 192.168.1.128:50055
+2022/03/05 20:37:09 server listening at 192.168.1.128:50056
+2022/03/05 20:37:09 server listening at 192.168.1.128:50058
+2022/03/05 20:37:09 server listening at 192.168.1.128:50054
+2022/03/05 20:37:09 server listening at 192.168.1.128:50057
+
+2022/03/05 21:06:12
+---------
+2022/03/05 21:06:16 server listening at 192.168.1.128:50050
+2022/03/05 21:06:16 server listening at 192.168.1.128:50057
+2022/03/05 21:06:16 server listening at 192.168.1.128:50051
+2022/03/05 21:06:16 server listening at 192.168.1.128:50052
+2022/03/05 21:06:16 server listening at 192.168.1.128:50053
+2022/03/05 21:06:16 server listening at 192.168.1.128:50054
+2022/03/05 21:06:16 server listening at 192.168.1.128:50055
+2022/03/05 21:06:16 server listening at 192.168.1.128:50058
+2022/03/05 21:06:16 server listening at 192.168.1.128:50056
+
+2022/03/05 22:09:03
+---------
+2022/03/05 22:09:04 server listening at 192.168.1.128:50055
+2022/03/05 22:09:04 server listening at 192.168.1.128:50053
+2022/03/05 22:09:04 server listening at 192.168.1.128:50051
+2022/03/05 22:09:04 server listening at 192.168.1.128:50056
+2022/03/05 22:09:04 server listening at 192.168.1.128:50052
+2022/03/05 22:09:04 server listening at 192.168.1.128:50054
+2022/03/05 22:09:04 server listening at 192.168.1.128:50057
+2022/03/05 22:09:04 server listening at 192.168.1.128:50058
+2022/03/05 22:09:04 server listening at 192.168.1.128:50050
+192.168.1.128:50051 : 节点分裂中....
+192.168.1.128:50055 : 开始分裂....
+failed
+出错。。。
+panic: failed
+
+goroutine 5045 [running]:
+main.split()
+	/home/jerome/lab/distributedStorage/server/main.go:144 +0x978
+main.(*server).Set(0x819420, {0xc007effbd0, 0x48a286}, 0xc007effbd0)
+	/home/jerome/lab/distributedStorage/server/main.go:77 +0x3c5
+storage/kvstore._Storage_Set_Handler({0x8237a0, 0xc05e18}, {0x8e7900, 0xc0082fc6f0}, 0xc0082db500, 0x0)
+	/home/jerome/lab/distributedStorage/proto/kvstore_grpc.pb.go:173 +0x170
+google.golang.org/grpc.(*Server).processUnaryRPC(0xc0000f7180, {0x8ef0e0, 0xc0082fe000}, 0xc007561680, 0xc00014ce70, 0xbca280, 0x0)
+	/home/jerome/go/pkg/mod/google.golang.org/grpc@v1.44.0/server.go:1282 +0xccf
+google.golang.org/grpc.(*Server).handleStream(0xc0000f7180, {0x8ef0e0, 0xc0082fe000}, 0xc007561680, 0x0)
+	/home/jerome/go/pkg/mod/google.golang.org/grpc@v1.44.0/server.go:1616 +0xa2a
+google.golang.org/grpc.(*Server).serveStreams.func1.2()
+	/home/jerome/go/pkg/mod/google.golang.org/grpc@v1.44.0/server.go:921 +0x98
+created by google.golang.org/grpc.(*Server).serveStreams.func1
+	/home/jerome/go/pkg/mod/google.golang.org/grpc@v1.44.0/server.go:919 +0x294

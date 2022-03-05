@@ -41,6 +41,8 @@ func TestSetGet(t *testing.T) {
 
 	var statusCode commom.Status
 	var errorCode commom.Error
+	statusCode.Init()
+	errorCode.Init()
 
 	serverAddress := make(map[int64]string)
 	serverStatus := make(map[int64]string)
@@ -62,10 +64,11 @@ func TestSetGet(t *testing.T) {
 	next := reply.GetNext()
 	level := reply.GetLevel()
 	hashSize := reply.GetHashSize()
-	for idx, server := range reply.GetServer() {
-		serverAddress[int64(idx)] = server.Address
-		serverMaxKey[int64(idx)] = server.MaxKey
-		serverStatus[int64(idx)] = server.Status
+	for _, server := range reply.GetServer() {
+		idx := server.Idx
+		serverAddress[idx] = server.Address
+		serverMaxKey[idx] = server.MaxKey
+		serverStatus[idx] = server.Status
 	}
 
 	hashFunc := func(key string) int64 {
@@ -77,29 +80,20 @@ func TestSetGet(t *testing.T) {
 		return pos
 	}
 
-	keys := []string{
-		"MOsROLCTIE",
-		"pWptfikaqY",
-		"RMoFKiPxdv",
-		"MzYOYGggHt",
-		"KQMFMDENIH",
-		"quZcbNHFuq",
-		"kWWDMlohkz",
-		"XlokgZcwFt",
-		"zEtxdPERso",
-		"odDJUOkRKi",
-	}
-	values := []string{
-		"ljmbjmQKeB",
-		"iCKDKumsIQ",
-		"MlrYhdaNEU",
-		"iFzuFoYHtG",
-		"PuzlvRMmCR",
-		"JXeUOWqQyX",
-		"OrxWOjlNOb",
-		"fuBSKkQUuR",
-		"gQrGlrWqzA",
-		"aJsKDTniao",
+	keys := []string{}
+	values := []string{}
+
+	path, err := os.Getwd()
+	check(err)
+	filename := filepath.Join(path, "../data/data2")
+	f, err := os.Open(filename)
+	check(err)
+	defer f.Close()
+	sc := bufio.NewScanner(f)
+	for sc.Scan() {
+		kv := strings.Split(sc.Text(), " ")
+		keys = append(keys, kv[0])
+		values = append(values, kv[1])
 	}
 
 	// SET

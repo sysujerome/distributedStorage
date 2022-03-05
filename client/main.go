@@ -8,13 +8,16 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"math"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
 	pb "storage/kvstore"
+	"storage/util/common"
 	commom "storage/util/common"
 	crc16 "storage/util/crc16"
 
@@ -23,17 +26,18 @@ import (
 )
 
 var (
-	serverAddress map[int64]string
-	serverStatus  map[int64]string
-	serverMaxKey  map[int64]int64
-	next          int64
-	level         int64
-	hashSize      int64
-	ip            = flag.String("ip", "", "the base server to get configure")
-	port          = flag.Int64("port", 0, "the base server to get configure")
-	conf          = flag.String("conf", "", "the defaulted configure file")
-	statusCode    commom.Status
-	errorCode     commom.Error
+	serversAddress map[int64]string
+	serversStatus  map[int64]string
+	serversMaxKey  map[int64]int64
+	next           int64
+	level          int64
+	hashSize       int64
+	ip             = flag.String("ip", "", "the base server to get configure")
+	port           = flag.Int64("port", 0, "the base server to get configure")
+	conf           = flag.String("conf", "", "the defaulted configure file")
+	statusCode     commom.Status
+	errorCode      commom.Error
+	serverStatus   common.ServerStatus
 )
 
 func check(e error) {
@@ -46,35 +50,330 @@ func main() {
 	flag.Parse()
 	initConf()
 
-	printConf()
+	// printConf()
 	var conns []*grpc.ClientConn
-	for _, addr := range serverAddress {
+	for _, addr := range serversAddress {
 		conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		check(err)
 		conns = append(conns, conn)
 	}
 
-	currentPath, err := os.Getwd()
+	// currentPath, err := os.Getwd()
+	// check(err)
+	// filename := filepath.Join(currentPath, "data/benchmark_data")
+	// f, err := os.Open(filename)
+	// check(err)
+	// defer f.Close()
+
+	// sc := bufio.NewScanner(f)
+	// counter := 0
+	// start := time.Now()
+	// for sc.Scan() {
+	// 	operation := strings.Split(sc.Text(), " ")
+	// 	key := operation[1]
+	// 	idx := hashFunc(key) % 1
+	// 	getServe(operation, conns[idx])
+	// 	counter++
+	// }
+	// duration := time.Since(start)
+	// fmt.Printf("dealing with %d operations took %v Seconds\n", counter, duration.Seconds())
+	// var operation, key, value string
+	for {
+
+		// fmt.Scanln(&operation, &key, &value)
+		reader := bufio.NewReader(os.Stdin)
+		data, _, _ := reader.ReadLine()
+		operations := strings.Split(string(data), " ")
+
+		switch operations[0] {
+		case "scan":
+			scan(operations)
+		case "get":
+			get(operations)
+		case "set":
+			set(operations)
+
+		case "test":
+			test()
+		case "quit":
+			for _, conn := range conns {
+				conn.Close()
+			}
+			return
+		}
+
+	}
+
+}
+
+func scan(operations []string) {
+	var conns []*grpc.ClientConn
+	for idx := 0; idx < len(serversAddress); idx++ {
+		addr := serversAddress[int64(idx)]
+		conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		check(err)
+		conns = append(conns, conn)
+	}
+	for idx := 0; idx < len(serversAddress); idx++ {
+		server := serversAddress[int64(idx)]
+		if len(operations) > 1 {
+			if operations[1] == "conf" {
+				c := pb.NewStorageClient(conns[0])
+				ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
+				defer cancel()
+				reply, err := c.GetConf(ctx, &pb.GetConfRequest{})
+				check(err)
+				fmt.Printf("conf: \n%s\n", reply.GetResult())
+				servers := reply.GetServer()
+				for _, server := range servers {
+					fmt.Printf("idx : %d\n", server.Idx)
+					fmt.Printf("address : %s\n", server.Address)
+					fmt.Printf("maxKey: %d\n", server.MaxKey)
+					fmt.Printf("status: %s\n\n", server.Status)
+				}
+				break
+			}
+
+			index, err := strconv.Atoi(operations[1])
+			check(err)
+			c := pb.NewStorageClient(conns[index])
+			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
+			defer cancel()
+			reply, err := c.Scan(ctx, &pb.ScanRequest{})
+			check(err)
+			fmt.Printf("status: %s\n", serversStatus[int64(idx)])
+			fmt.Printf("count: %d\n", reply.GetCount())
+			fmt.Printf("result:\n%s\n\n", reply.GetResult())
+			break
+		}
+		fmt.Printf("idx: %d\n", idx)
+		fmt.Println(server)
+		fmt.Printf("status: %s\n", serversStatus[int64(idx)])
+		c := pb.NewStorageClient(conns[idx])
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
+		defer cancel()
+		reply, err := c.Scan(ctx, &pb.ScanRequest{})
+		check(err)
+		count := reply.GetCount()
+		fmt.Printf("count: %d\n\n", count)
+	}
+	for _, conn := range conns {
+		conn.Close()
+	}
+}
+func set(operations []string) {
+	if len(operations) < 3 {
+		// panic("too less agrs")
+		fmt.Println("too less arguments")
+		return
+	}
+	key := operations[1]
+	value := operations[2]
+	var conns []*grpc.ClientConn
+	for idx := 0; idx < len(serversAddress); idx++ {
+		addr := serversAddress[int64(idx)]
+		conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		check(err)
+		conns = append(conns, conn)
+	}
+	idx := hashFunc(key)
+	fmt.Printf("idx: %d\n", idx)
+	c := pb.NewStorageClient(conns[idx])
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
+	defer cancel()
+	reply, err := c.Set(ctx, &pb.SetRequest{Key: key, Value: value})
 	check(err)
-	filename := filepath.Join(currentPath, "data/benchmark_data")
+	status := reply.GetStatus()
+	result := reply.GetResult()
+	fmt.Printf("status: %s\nresult: %s\n", status, result)
+	if status != statusCode.Ok {
+		fmt.Printf("error: %s\n", reply.GetErr())
+	}
+	for _, conn := range conns {
+		conn.Close()
+	}
+}
+func get(operations []string) {
+	if len(operations) < 2 {
+		// panic("too less agrs")
+		fmt.Println("too less arguments")
+		return
+	}
+	key := operations[1]
+	var conns []*grpc.ClientConn
+	for idx := 0; idx < len(serversAddress); idx++ {
+		addr := serversAddress[int64(idx)]
+		conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		check(err)
+		conns = append(conns, conn)
+	}
+	idx := hashFunc(key)
+	fmt.Printf("idx: %d\n", idx)
+	c := pb.NewStorageClient(conns[idx])
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
+	defer cancel()
+	reply, err := c.Get(ctx, &pb.GetRequest{Key: key})
+	check(err)
+	status := reply.GetStatus()
+	result := reply.GetResult()
+	fmt.Printf("status: %s\nresult: %s\n", status, result)
+	if status != statusCode.Ok {
+		fmt.Printf("error: %s\n", reply.GetErr())
+	}
+	for _, conn := range conns {
+		conn.Close()
+	}
+}
+
+func test() {
+
+	var statusCode commom.Status
+	var errorCode commom.Error
+	statusCode.Init()
+	errorCode.Init()
+
+	serverAddress := make(map[int64]string)
+	serverStatus := make(map[int64]string)
+	serverMaxKey := make(map[int64]int64)
+
+	address := "192.168.1.128:50050"
+	conn, err := grpc.Dial(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	check(err)
+	defer conn.Close()
+	c := pb.NewStorageClient(conn)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
+	defer cancel()
+	reply, err := c.GetConf(ctx, &pb.GetConfRequest{})
+	check(err)
+	if reply.GetStatus() != statusCode.Ok {
+		fmt.Println("同步服务器配置出错...")
+	}
+
+	next := reply.GetNext()
+	level := reply.GetLevel()
+	hashSize := reply.GetHashSize()
+	for _, server := range reply.GetServer() {
+		idx := server.Idx
+		serverAddress[idx] = server.Address
+		serverMaxKey[idx] = server.MaxKey
+		serverStatus[idx] = server.Status
+	}
+
+	hashFunc := func(key string) int64 {
+		posCRC16 := int64(crc16.Checksum([]byte(key), crc16.IBMTable))
+		pos := posCRC16 % (int64(math.Pow(2.0, float64(level))) * hashSize)
+		if pos < next { // 分裂过了的
+			pos = posCRC16 % (int64(math.Pow(2.0, float64(level+1))) * hashSize)
+		}
+		return pos
+	}
+
+	keys := []string{}
+	values := []string{}
+
+	path, err := os.Getwd()
+	check(err)
+	filename := filepath.Join(path, "./data/data2")
 	f, err := os.Open(filename)
 	check(err)
 	defer f.Close()
-
 	sc := bufio.NewScanner(f)
-	counter := 0
-	start := time.Now()
 	for sc.Scan() {
-		operation := strings.Split(sc.Text(), " ")
-		key := operation[1]
-		idx := hashFunc(key)
-		getServe(operation, conns[idx])
-		counter++
+		kv := strings.Split(sc.Text(), " ")
+		keys = append(keys, kv[0])
+		values = append(values, kv[1])
+		// fmt.Println(kv[0], kv[1])
 	}
-	duration := time.Since(start)
-	fmt.Printf("dealing with %d operations took %v Seconds\n", counter, duration.Seconds())
-}
+	fmt.Println("set....")
+	// SET
+	for i := 0; i < len(keys); i++ {
+		key := keys[i]
+		value := values[i]
+		idx := hashFunc(key)
+		addr := serverAddress[idx]
+		conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		check(err)
+		defer conn.Close()
+		c := pb.NewStorageClient(conn)
 
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
+		defer cancel()
+		reply, err := c.Set(ctx, &pb.SetRequest{Key: key, Value: value})
+		if err != nil || reply.GetStatus() != statusCode.Ok {
+			panic(reply.GetErr())
+		}
+		// fmt.Println(reply.GetStatus())
+	}
+
+	fmt.Println("get....")
+	// GET
+	for i := 0; i < len(keys); i++ {
+		key := keys[i]
+		value := values[i]
+		idx := hashFunc(key)
+		addr := serverAddress[idx]
+		conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		check(err)
+		defer conn.Close()
+		c := pb.NewStorageClient(conn)
+
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
+		defer cancel()
+		reply, err := c.Get(ctx, &pb.GetRequest{Key: key})
+		if err != nil || reply.GetStatus() != statusCode.Ok {
+			panic(reply.GetErr())
+		}
+		if reply.GetResult() != value {
+			panic("Wrong value!!!")
+		}
+	}
+
+	return
+
+	// DEL
+	fmt.Println("del....")
+	for i := 0; i < len(keys); i++ {
+		key := keys[i]
+		idx := hashFunc(key)
+		addr := serverAddress[idx]
+		conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		check(err)
+		defer conn.Close()
+		c := pb.NewStorageClient(conn)
+
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
+		defer cancel()
+		reply, err := c.Del(ctx, &pb.DelRequest{Key: key})
+		if err != nil || reply.GetStatus() != statusCode.Ok {
+			panic(reply.GetErr())
+		}
+		if reply.GetResult() != 1 {
+			log.Fatalf("Delete key %s failed!", key)
+		}
+	}
+
+	// GET
+	fmt.Println("get....")
+	for i := 0; i < len(keys); i++ {
+		key := keys[i]
+		idx := hashFunc(key)
+		addr := serverAddress[idx]
+		conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		check(err)
+		defer conn.Close()
+		c := pb.NewStorageClient(conn)
+
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
+		defer cancel()
+		reply, err := c.Get(ctx, &pb.GetRequest{Key: key})
+		if err != nil {
+			panic(err)
+		}
+		if reply.GetErr() != errorCode.NotFound {
+			panic("Wrong value!!!")
+		}
+	}
+}
 func getServe(operation []string, conn *grpc.ClientConn) {
 
 	c := pb.NewStorageClient(conn)
@@ -87,29 +386,35 @@ func getServe(operation []string, conn *grpc.ClientConn) {
 	case "get":
 		reply, err := c.Get(ctx, &pb.GetRequest{Key: operation[1]})
 		check(err)
-		fmt.Println(reply.GetStatus())
+		fmt.Printf("%s", reply.GetStatus())
 	case "set":
+		for len(operation) < 3 {
+			operation = append(operation, "dafaskjdhf")
+		}
 		reply, err := c.Set(ctx, &pb.SetRequest{Key: operation[1], Value: operation[2]})
 		check(err)
-		fmt.Println(reply.GetStatus())
+		fmt.Printf("%s", reply.GetStatus())
 	case "del":
 		reply, err := c.Del(ctx, &pb.DelRequest{Key: operation[1]})
 		check(err)
-		fmt.Println(reply.GetStatus())
+		fmt.Printf("%s", reply.GetStatus())
 	}
 
 }
 
 func initConf() {
 
-	serverAddress = make(map[int64]string)
-	serverStatus = make(map[int64]string)
-	serverMaxKey = make(map[int64]int64)
+	serversAddress = make(map[int64]string)
+	serversStatus = make(map[int64]string)
+	serversMaxKey = make(map[int64]int64)
 	address := ""
+	errorCode.Init()
+	statusCode.Init()
+	serverStatus.Init()
 	defer flag.Parse()
 	curPath, err := os.Getwd()
 	check(err)
-	if *conf != errorCode.NotDefined {
+	if *conf != "" {
 		filePath := filepath.Join(curPath, *conf)
 		//检查文件是否存在
 		if _, err := os.Stat(filePath); errors.Is(err, os.ErrNotExist) {
@@ -129,12 +434,13 @@ func initConf() {
 				ip := configureDetail["ip"].(string)
 				port := int64(configureDetail["base_port"].(float64))
 				address := fmt.Sprintf("%s:%d", ip, port)
-				serverAddress[idx] = address
-				serverStatus[idx] = configureDetail["status"].(string)
-				serverMaxKey[idx] = int64(configureDetail["max_key"].(float64))
+				serversAddress[idx] = address
+				serversStatus[idx] = configureDetail["status"].(string)
+				serversMaxKey[idx] = int64(configureDetail["max_key"].(float64))
+				fmt.Println(idx, serversStatus[idx])
 			}
 		}
-		address = serverAddress[0]
+		address = serversAddress[0]
 	}
 	if *ip != "" {
 		address = fmt.Sprintf("%s:%d", *ip, *port)
@@ -151,30 +457,34 @@ func initConf() {
 	reply, err := c.GetConf(ctx, &pb.GetConfRequest{})
 	check(err)
 	if reply.GetStatus() != statusCode.Ok {
+		fmt.Println(reply.GetStatus())
+		fmt.Println(statusCode.Ok)
 		fmt.Println("同步服务器配置出错...")
 	}
 	next = reply.GetNext()
 	level = reply.GetLevel()
 	hashSize = reply.GetHashSize()
-	for idx, server := range reply.GetServer() {
-		serverAddress[int64(idx)] = server.Address
-		serverMaxKey[int64(idx)] = server.MaxKey
-		serverStatus[int64(idx)] = server.Status
+	for _, server := range reply.GetServer() {
+		idx := server.Idx
+		serversAddress[int64(idx)] = server.Address
+		serversMaxKey[int64(idx)] = server.MaxKey
+		serversStatus[int64(idx)] = server.Status
 	}
+	// printConf()
 }
 
 func printConf() {
-	for idx, addr := range serverAddress {
+	for idx, addr := range serversAddress {
 		fmt.Printf("%d %s\t", idx, addr)
 	}
 	fmt.Println()
 
-	for idx, maxKey := range serverMaxKey {
+	for idx, maxKey := range serversMaxKey {
 		fmt.Printf("%d %d\t", idx, maxKey)
 	}
 	fmt.Println()
 
-	for idx, status := range serverStatus {
+	for idx, status := range serversStatus {
 		fmt.Printf("%d %s\t", idx, status)
 	}
 	fmt.Println()

@@ -17,5 +17,5 @@ ps -ef | grep ./bin/client | grep -v grep | awk '{print $2}' | xargs kill -9
 ./bin/server --shard_idx=8 &>> log &
 
 
-./bin/client --ip=192.168.1.128 --port=50050
+# ./bin/client --ip=192.168.1.128 --port=50050
 echo "---------" >> log

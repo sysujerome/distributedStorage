@@ -12,6 +12,7 @@ service Storage {
     rpc Scan(ScanRequest) returns (ScanReply) {}
     rpc SyncConf(SyncConfRequest) returns (SyncConfReply) {}
     rpc getConf(GetConfRequest) returns (GetConfReply) {}
+    rpc WakeUp(WakeRequest) returns (WakeReply) {}
 }
 
 message SetRequest {
@@ -53,16 +54,18 @@ message SplitReply {
     string err = 1;
     string status = 2;
     int64 result = 3;
+    bool full = 4;
 }
 
 message ScanRequest {
-    int64 port = 1;
+    int64 idx = 1;
 }
 
 message ScanReply {
     string err = 1;
     string status = 2;
     string result = 3;
+    int64 count = 4;
 }
 
 message SyncConfRequest {
@@ -103,4 +106,15 @@ message GetConfReply {
         int64 maxKey = 4;
     }
     repeated ServConf server = 7;
+}
+
+
+message WakeRequest {
+    int64 noname = 1; // 不知道要啥参数
+}
+
+message WakeReply {
+    string err = 1;
+    string status = 2;
+    string result = 3;
 }
