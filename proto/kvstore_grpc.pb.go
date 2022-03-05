@@ -25,6 +25,7 @@ type StorageClient interface {
 	Scan(ctx context.Context, in *ScanRequest, opts ...grpc.CallOption) (*ScanReply, error)
 	SyncConf(ctx context.Context, in *SyncConfRequest, opts ...grpc.CallOption) (*SyncConfReply, error)
 	GetConf(ctx context.Context, in *GetConfRequest, opts ...grpc.CallOption) (*GetConfReply, error)
+	WakeUp(ctx context.Context, in *WakeRequest, opts ...grpc.CallOption) (*WakeReply, error)
 }
 
 type storageClient struct {
@@ -98,6 +99,15 @@ func (c *storageClient) GetConf(ctx context.Context, in *GetConfRequest, opts ..
 	return out, nil
 }
 
+func (c *storageClient) WakeUp(ctx context.Context, in *WakeRequest, opts ...grpc.CallOption) (*WakeReply, error) {
+	out := new(WakeReply)
+	err := c.cc.Invoke(ctx, "/kvstore.Storage/WakeUp", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // StorageServer is the server API for Storage service.
 // All implementations must embed UnimplementedStorageServer
 // for forward compatibility
@@ -109,6 +119,7 @@ type StorageServer interface {
 	Scan(context.Context, *ScanRequest) (*ScanReply, error)
 	SyncConf(context.Context, *SyncConfRequest) (*SyncConfReply, error)
 	GetConf(context.Context, *GetConfRequest) (*GetConfReply, error)
+	WakeUp(context.Context, *WakeRequest) (*WakeReply, error)
 	mustEmbedUnimplementedStorageServer()
 }
 
@@ -136,6 +147,9 @@ func (UnimplementedStorageServer) SyncConf(context.Context, *SyncConfRequest) (*
 }
 func (UnimplementedStorageServer) GetConf(context.Context, *GetConfRequest) (*GetConfReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetConf not implemented")
+}
+func (UnimplementedStorageServer) WakeUp(context.Context, *WakeRequest) (*WakeReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method WakeUp not implemented")
 }
 func (UnimplementedStorageServer) mustEmbedUnimplementedStorageServer() {}
 
@@ -276,6 +290,24 @@ func _Storage_GetConf_Handler(srv interface{}, ctx context.Context, dec func(int
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Storage_WakeUp_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(WakeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StorageServer).WakeUp(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/kvstore.Storage/WakeUp",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StorageServer).WakeUp(ctx, req.(*WakeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Storage_ServiceDesc is the grpc.ServiceDesc for Storage service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -310,6 +342,10 @@ var Storage_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "getConf",
 			Handler:    _Storage_GetConf_Handler,
+		},
+		{
+			MethodName: "WakeUp",
+			Handler:    _Storage_WakeUp_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

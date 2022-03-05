@@ -9,6 +9,14 @@ type Status struct {
 type Error struct {
 	NotFound   string
 	NotDefined string
+	NotWorking string
+}
+
+type ServerStatus struct {
+	Working  string
+	Sleep    string
+	Spliting string
+	Full     string
 }
 
 func (sta *Status) Init() {
@@ -19,4 +27,12 @@ func (sta *Status) Init() {
 func (err *Error) Init() {
 	err.NotFound = "not found!"
 	err.NotDefined = "not defined!"
+	err.NotWorking = "the server is sleeping now"
+}
+
+func (ss *ServerStatus) Init() {
+	ss.Working = "working"
+	ss.Sleep = "sleep"
+	ss.Spliting = "spliting"
+	ss.Full = "can not split"
 }

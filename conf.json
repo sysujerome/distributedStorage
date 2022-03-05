@@ -8,8 +8,8 @@
                 "shard_node_0":  {
                     "ip":"192.168.1.128",
                     "base_port":50050,
-                    "status":"using",
-                    "max_key":100000
+                    "status":"working",
+                    "max_key":1000
                 }
             }
         },
@@ -19,8 +19,8 @@
                 "shard_node_1":  {
                     "ip":"192.168.1.128",
                     "base_port":50051,
-                    "status":"using",
-                    "max_key":100000
+                    "status":"working",
+                    "max_key":1000
                 }
             }
         },
@@ -30,8 +30,8 @@
                 "shard_node_2":  {
                     "ip":"192.168.1.128",
                     "base_port":50052,
-                    "status":"using",
-                    "max_key":100000
+                    "status":"working",
+                    "max_key":1000
                 }
             }
         },
@@ -41,8 +41,8 @@
                 "shard_node_3":  {
                     "ip":"192.168.1.128",
                     "base_port":50053,
-                    "status":"using",
-                    "max_key":100000
+                    "status":"working",
+                    "max_key":1000
                 }
             }
         },
@@ -52,8 +52,8 @@
                 "shard_node_4":  {
                     "ip":"192.168.1.128",
                     "base_port":50054,
-                    "status":"free",
-                    "max_key":100000
+                    "status":"sleep",
+                    "max_key":1000
                 }
             }
         },
@@ -63,8 +63,8 @@
                 "shard_node_5":  {
                     "ip":"192.168.1.128",
                     "base_port":50055,
-                    "status":"free",
-                    "max_key":100000
+                    "status":"sleep",
+                    "max_key":1000
                 }
             }
         },
@@ -74,8 +74,8 @@
                 "shard_node_6":  {
                     "ip":"192.168.1.128",
                     "base_port":50056,
-                    "status":"free",
-                    "max_key":100000
+                    "status":"sleep",
+                    "max_key":1000
                 }
             }
         },
@@ -85,8 +85,8 @@
                 "shard_node_7":  {
                     "ip":"192.168.1.128",
                     "base_port":50057,
-                    "status":"free",
-                    "max_key":100000
+                    "status":"sleep",
+                    "max_key":1000
                 }
             }
         },
@@ -96,8 +96,8 @@
                 "shard_node_8":  {
                     "ip":"192.168.1.128",
                     "base_port":50058,
-                    "status":"free",
-                    "max_key":100000
+                    "status":"sleep",
+                    "max_key":1000
                 }
             }
         }
