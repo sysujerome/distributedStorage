@@ -259,6 +259,17 @@ func test() {
 		serverStatus[idx] = server.Status
 	}
 
+	var conns []*grpc.ClientConn
+	var clients []pb.StorageClient
+	for idx := 0; idx < len(serversAddress); idx++ {
+		addr := serversAddress[int64(idx)]
+		conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		check(err)
+		conns = append(conns, conn)
+		c := pb.NewStorageClient(conn)
+		clients = append(clients, c)
+	}
+
 	hashFunc := func(key string) int64 {
 		posCRC16 := int64(crc16.Checksum([]byte(key), crc16.IBMTable))
 		pos := posCRC16 % (int64(math.Pow(2.0, float64(level))) * hashSize)
@@ -287,19 +298,23 @@ func test() {
 	fmt.Println("set....")
 	// SET
 	for i := 0; i < len(keys); i++ {
+		if i%5000 == 0 {
+			fmt.Printf("%d epoch...\n", i)
+		}
 		key := keys[i]
 		value := values[i]
 		idx := hashFunc(key)
-		addr := serverAddress[idx]
-		conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
-		check(err)
-		defer conn.Close()
-		c := pb.NewStorageClient(conn)
+		// addr := serverAddress[idx]
+		// conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		// check(err)
+		// defer conn.Close()
+		// c := pb.NewStorageClient(conn)
 
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
 		defer cancel()
-		reply, err := c.Set(ctx, &pb.SetRequest{Key: key, Value: value})
-		if err != nil || reply.GetStatus() != statusCode.Ok {
+		reply, err := clients[idx].Set(ctx, &pb.SetRequest{Key: key, Value: value})
+		if err != nil || reply.GetStatus() == statusCode.Failed {
+			fmt.Printf("%s status: %s\n", serversAddress[idx], reply.GetStatus())
 			panic(reply.GetErr())
 		}
 		// fmt.Println(reply.GetStatus())
@@ -307,27 +322,41 @@ func test() {
 
 	fmt.Println("get....")
 	// GET
+	failedNumber := 0
+	wrongNumber := 0
 	for i := 0; i < len(keys); i++ {
+		if i%5000 == 0 {
+			fmt.Printf("%d epoch...\n", i)
+		}
 		key := keys[i]
 		value := values[i]
 		idx := hashFunc(key)
-		addr := serverAddress[idx]
-		conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
-		check(err)
-		defer conn.Close()
-		c := pb.NewStorageClient(conn)
+		// addr := serverAddress[idx]
+		// conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		// check(err)
+		// defer conn.Close()
+		// c := pb.NewStorageClient(conn)
 
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
 		defer cancel()
-		reply, err := c.Get(ctx, &pb.GetRequest{Key: key})
+		reply, err := clients[idx].Get(ctx, &pb.GetRequest{Key: key})
 		if err != nil || reply.GetStatus() != statusCode.Ok {
-			panic(reply.GetErr())
-		}
-		if reply.GetResult() != value {
-			panic("Wrong value!!!")
+			// fmt.Printf("status : %s\n", reply.GetStatus())
+			// panic(reply.GetErr())
+			failedNumber++
+		} else if reply.GetResult() != value {
+			// panic("Wrong value!!!")
+			wrongNumber++
 		}
 	}
 
+	fmt.Printf("Total number : %d\n", len(keys))
+	fmt.Printf("Failed number : %d\n", failedNumber)
+	fmt.Printf("Wrong number : %d\n", wrongNumber)
+
+	for idx := 0; idx < len(serversAddress); idx++ {
+		conns[idx].Close()
+	}
 	return
 
 	// DEL

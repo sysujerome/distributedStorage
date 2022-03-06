@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	crc16 "storage/util/crc16"
+	"time"
 )
 
 func hashFunc(key string) int64 {
@@ -22,5 +23,6 @@ func main() {
 	fmt.Scanf("%s", &key)
 	for i := 0; i < 10; i++ {
 		fmt.Println(hashFunc(key))
+		fmt.Println(time.Now().Nanosecond())
 	}
 }

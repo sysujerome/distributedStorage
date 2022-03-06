@@ -1,11 +1,10 @@
 package main
 
 import (
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"path/filepath"
-	"strings"
+	"strconv"
 	"time"
 )
 
@@ -15,7 +14,7 @@ func init() {
 
 var (
 	letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-	operators   = []string{"get", "set", "del"}
+	// operators   = []string{"get", "set", "del"}
 	// length      = flag.Int("length", 100000, "the number of cases")
 )
 
@@ -24,7 +23,7 @@ func RandStringRunes(n int) string {
 	for i := range b {
 		b[i] = letterRunes[rand.Intn(len(letterRunes))]
 	}
-	return string(b)
+	return string(b) + strconv.Itoa(time.Now().Nanosecond())
 }
 
 func check(e error) {
@@ -70,21 +69,16 @@ func main() {
 
 func generate_test_data() {
 	path, _ := os.Getwd()
-	filename := filepath.Join(path, "data/test_data")
-	f, err := os.Open(filename)
-	check(err)
-	defer f.Close()
 	wirter, err := os.Create(filepath.Join(path, "data/data2"))
 	check(err)
 	defer wirter.Close()
 
-	data, err := ioutil.ReadAll(f)
-	check(err)
-	kvs := strings.Split(string(data), "\n")
+	length := 10 * 10000
 	newline := ""
-	for i := 0; i+1 < len(kvs); i += 2 {
-		wirter.WriteString(newline + kvs[i] + " " + kvs[i+1])
-		// fmt.Println(newline + kvs[i] + " " + kvs[i+1])
+	for i := 0; i < length; i++ {
+		key := RandStringRunes(10)
+		value := RandStringRunes(10)
+		wirter.WriteString(newline + key + " " + value)
 		newline = "\n"
 	}
 }
