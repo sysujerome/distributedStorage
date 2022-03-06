@@ -50,7 +50,7 @@ func (s *server) Get(ctx context.Context, in *pb.GetRequest) (*pb.GetReply, erro
 
 	if serversStatus[*shardIdx] == serverStatus.Spliting {
 		operations = append(operations, []string{"get", in.GetKey()})
-		return &pb.GetReply{Result: "", Status: statusCode.Stored}, nil
+		return &pb.GetReply{Result: "", Status: statusCode.Stored, Err: errorCode.Stored}, nil
 	}
 	value, found := db[in.GetKey()]
 	if !found {
@@ -67,11 +67,11 @@ func (s *server) Set(ctx context.Context, in *pb.SetRequest) (*pb.SetReply, erro
 	// log.Printf("Received get key: %v", in.GetKey())
 	if serversStatus[*shardIdx] == serverStatus.Spliting {
 		operations = append(operations, []string{"set", in.GetKey(), in.GetValue()})
-		return &pb.SetReply{Result: "", Status: statusCode.Stored}, nil
+		return &pb.SetReply{Result: "", Status: statusCode.Stored, Err: errorCode.Stored}, nil
 	}
 	db[in.GetKey()] = in.GetValue()
 	if db[in.GetKey()] != in.GetValue() {
-		return &pb.SetReply{Status: "failed!!!"}, nil
+		return &pb.SetReply{Result: "", Status: statusCode.Failed, Err: errorCode.NotDefined}, nil
 	}
 	if len(db) > int(serversMaxKey[*shardIdx]) && canSplit {
 		split()
@@ -87,34 +87,22 @@ func (s *server) Del(ctx context.Context, in *pb.DelRequest) (*pb.DelReply, erro
 	// log.Printf("Received get key: %v", in.GetKey())
 	if serversStatus[*shardIdx] == serverStatus.Spliting {
 		operations = append(operations, []string{"del", in.GetKey()})
-		return &pb.DelReply{Result: 0, Status: statusCode.Stored}, nil
+		return &pb.DelReply{Result: 0, Status: statusCode.Stored, Err: errorCode.Stored}, nil
 	}
 	delete(db, in.GetKey())
 	_, found := db[in.GetKey()]
 	if found {
-		return &pb.DelReply{Err: errorCode.NotFound, Status: statusCode.Failed}, nil
+		return &pb.DelReply{Result: 0, Status: statusCode.Failed, Err: errorCode.NotDefined}, nil
 	}
 	return &pb.DelReply{Result: 1, Status: statusCode.Ok}, nil
 }
 
-func split() (int64, bool) { // 内部元素分裂
-	fmt.Printf("%s : 节点分裂中....\n", serversAddress[*shardIdx])
-	serversStatus[*shardIdx] = serverStatus.Spliting
-	secondIdx := int64(math.Pow(2, float64(*level))*float64(*hashSize) + float64(*shardIdx))
-	if secondIdx >= int64(len(serversAddress)) {
-		fmt.Printf("%s : 节点数满了....\n", serversAddress[*shardIdx])
-		canSplit = false
-		return 0, true
+func split() {
+	if *next >= int64(len(serversAddress)) {
+		fmt.Println("分裂失败, 节点满了。。。")
 	}
-
-	*next++
-	if *next == int64(math.Pow(2, float64(*level)))**hashSize {
-		*next = 0
-		*level++
-	}
-	syncConf()
-	target := serversAddress[secondIdx]
-	conn, err := grpc.Dial(target, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	addr := serversAddress[*next]
+	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	check(err)
 	defer conn.Close()
 	c := pb.NewStorageClient(conn)
@@ -122,51 +110,86 @@ func split() (int64, bool) { // 内部元素分裂
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
 	defer cancel()
 
-	reply, err := c.WakeUp(ctx, &pb.WakeRequest{})
+	reply, err := c.Split(ctx, &pb.SplitRequest{})
 	check(err)
-	if reply.GetStatus() != statusCode.Ok {
-		fmt.Printf("%s : 节点唤醒失败....\n", serversAddress[secondIdx])
-		return 0, false
+	if reply.GetFull() {
+		fmt.Println("分裂失败, 节点满了。。。")
 	}
-	syncConf()
-
-	fmt.Printf("%s : 开始分裂....\n", serversAddress[secondIdx])
-	count := 0
-	for key, value := range db {
-		if crc16.Checksum([]byte(key), crc16.IBMTable)%2 == 1 { // 待修改
-			delete(db, key)
-		}
-		reply1, err := c.Set(ctx, &pb.SetRequest{Key: key, Value: value})
-		check(err)
-		if reply1.GetStatus() != statusCode.Ok {
-			fmt.Println(reply1.GetStatus())
-			fmt.Println("出错。。。")
-			panic(reply1.GetStatus())
-		}
-		count++
-	}
-	fmt.Printf("%s : 分裂完成....\n", serversAddress[secondIdx])
-	syncConf()
-	// serversStatus[*shardIdx] = serverStatus.Working
-	return int64(count), false
 }
 
 func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply, error) {
 	// log.Printf("Received get key: %v", in.GetKey())
-	count, full := split()
+
+	splitInside := func() (int64, bool) { // 内部元素分裂
+		fmt.Printf("%s : 节点分裂中....\n", serversAddress[*shardIdx])
+		serversStatus[*shardIdx] = serverStatus.Spliting
+		secondIdx := int64(math.Pow(2, float64(*level))*float64(*hashSize) + float64(*shardIdx))
+		if secondIdx >= int64(len(serversAddress)) {
+			fmt.Printf("%s : 节点数满了....\n", serversAddress[*shardIdx])
+			canSplit = false
+			return 0, true
+		}
+
+		*next++
+		if *next == int64(math.Pow(2, float64(*level)))**hashSize {
+			*next = 0
+			*level++
+		}
+		syncConf()
+		target := serversAddress[secondIdx]
+		conn, err := grpc.Dial(target, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		check(err)
+		defer conn.Close()
+		c := pb.NewStorageClient(conn)
+		// Contact the server and print out its response.
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
+		defer cancel()
+
+		reply, err := c.WakeUp(ctx, &pb.WakeRequest{})
+		check(err)
+		if reply.GetStatus() != statusCode.Ok {
+			fmt.Printf("%s %s : 节点唤醒失败....\n", serversAddress[*shardIdx], serversAddress[secondIdx])
+			return 0, false
+		}
+		syncConf()
+
+		fmt.Printf("%s : 开始分裂....\n", serversAddress[secondIdx])
+		count := 0
+		for key, value := range db {
+			if crc16.Checksum([]byte(key), crc16.IBMTable)%2 == 1 { // 待修改
+				delete(db, key)
+			}
+			reply1, err := c.Set(ctx, &pb.SetRequest{Key: key, Value: value})
+			check(err)
+			if reply1.GetStatus() != statusCode.Ok {
+				fmt.Println(reply1.GetStatus())
+				fmt.Println("出错。。。")
+				panic(reply1.GetErr())
+			}
+			count++
+		}
+		fmt.Printf("%s : 分裂完成....\n", serversAddress[secondIdx])
+		serversStatus[*shardIdx] = serverStatus.Working
+		syncConf()
+		// 处理存起来的操作
+		fmt.Println("处理存起来的操作...")
+		for _, operation := range operations {
+			switch operation[0] {
+			case "set":
+				db[operation[1]] = operation[2]
+			case "del":
+				delete(db, operation[1])
+			}
+		}
+
+		// serversStatus[*shardIdx] = serverStatus.Working
+		return int64(count), false
+	}
+
+	count, full := splitInside()
 	if full {
 		canSplit = false
 		return &pb.SplitReply{Status: statusCode.Ok, Result: 0, Full: true}, nil
-	}
-	// 处理存起来的操作
-	fmt.Println("处理存起来的操作...")
-	for _, operation := range operations {
-		switch operation[0] {
-		case "set":
-			db[operation[1]] = operation[2]
-		case "del":
-			delete(db, operation[1])
-		}
 	}
 
 	return &pb.SplitReply{Status: statusCode.Ok, Result: count}, nil
@@ -280,6 +303,7 @@ func (s *server) WakeUp(ctx context.Context, in *pb.WakeRequest) (*pb.WakeReply,
 		return &pb.WakeReply{Status: statusCode.Failed, Result: "The server is not sleep..."}, nil
 	}
 	serversStatus[*shardIdx] = serverStatus.Working
+	syncConf()
 	return &pb.WakeReply{Status: statusCode.Ok}, nil
 }
 

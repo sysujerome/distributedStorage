@@ -10,6 +10,7 @@ type Error struct {
 	NotFound   string
 	NotDefined string
 	NotWorking string
+	Stored     string
 }
 
 type ServerStatus struct {
@@ -27,7 +28,8 @@ func (sta *Status) Init() {
 func (err *Error) Init() {
 	err.NotFound = "not found!"
 	err.NotDefined = "not defined!"
-	err.NotWorking = "the server is sleeping now"
+	err.NotWorking = "the server is sleeping now."
+	err.Stored = "the operation is stored."
 }
 
 func (ss *ServerStatus) Init() {
