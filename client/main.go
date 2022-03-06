@@ -306,7 +306,7 @@ func test() {
 		idx := hashFunc(key)
 		// addr := serverAddress[idx]
 		// conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
-		// check(err)
+		// check(err)d
 		// defer conn.Close()
 		// c := pb.NewStorageClient(conn)
 
@@ -457,17 +457,16 @@ func initConf() {
 		for _, v := range shardConfs {
 			shardConf := v.(map[string]interface{})
 			idx := int64(shardConf["shard_idx"].(float64))
+
 			ShardNodeConfs := shardConf["shard_node_confs"].(map[string]interface{})
-			for _, ShardNodeConf := range ShardNodeConfs {
-				configureDetail := ShardNodeConf.(map[string]interface{})
-				ip := configureDetail["ip"].(string)
-				port := int64(configureDetail["base_port"].(float64))
-				address := fmt.Sprintf("%s:%d", ip, port)
-				serversAddress[idx] = address
-				serversStatus[idx] = configureDetail["status"].(string)
-				serversMaxKey[idx] = int64(configureDetail["max_key"].(float64))
-				fmt.Println(idx, serversStatus[idx])
-			}
+
+			ip := ShardNodeConfs["ip"].(string)
+			port := int64(ShardNodeConfs["base_port"].(float64))
+			address := fmt.Sprintf("%s:%d", ip, port)
+			serversAddress[idx] = address
+			serversStatus[idx] = ShardNodeConfs["status"].(string)
+			serversMaxKey[idx] = int64(ShardNodeConfs["max_key"].(float64))
+			// fmt.Println(idx, ip, port)
 		}
 		address = serversAddress[0]
 	}

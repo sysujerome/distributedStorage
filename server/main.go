@@ -13,8 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	pb "storage/kvstore"
-	"storage/util/common"
-	commom "storage/util/common"
+	common "storage/util/common"
 	crc16 "storage/util/crc16"
 	"time"
 
@@ -33,8 +32,8 @@ var (
 	level          = flag.Int64("level", 0, "the initial level of hash function")
 	hashSize       = flag.Int64("hash_size", 4, "the initial count of hash number")
 	conf           = flag.String("conf", "conf.json", "the defaulted configure file")
-	statusCode     commom.Status
-	errorCode      commom.Error
+	statusCode     common.Status
+	errorCode      common.Error
 	serverStatus   common.ServerStatus
 	canSplit       bool
 )
@@ -169,8 +168,6 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 			count++
 		}
 		fmt.Printf("%s : 分裂完成....\n", serversAddress[secondIdx])
-		serversStatus[*shardIdx] = serverStatus.Working
-		syncConf()
 		// 处理存起来的操作
 		fmt.Println("处理存起来的操作...")
 		for _, operation := range operations {
@@ -181,6 +178,8 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 				delete(db, operation[1])
 			}
 		}
+		serversStatus[*shardIdx] = serverStatus.Working
+		syncConf()
 
 		// serversStatus[*shardIdx] = serverStatus.Working
 		return int64(count), false
@@ -338,17 +337,15 @@ func initConf() {
 	for _, v := range shardConfs {
 		shardConf := v.(map[string]interface{})
 		idx := int64(shardConf["shard_idx"].(float64))
+
 		ShardNodeConfs := shardConf["shard_node_confs"].(map[string]interface{})
-		for _, ShardNodeConf := range ShardNodeConfs {
-			configureDetail := ShardNodeConf.(map[string]interface{})
-			ip := configureDetail["ip"].(string)
-			port := int64(configureDetail["base_port"].(float64))
-			address := fmt.Sprintf("%s:%d", ip, port)
-			serversAddress[idx] = address
-			serversStatus[idx] = configureDetail["status"].(string)
-			serversMaxKey[idx] = int64(configureDetail["max_key"].(float64))
-			// fmt.Println(idx, ip, port)
-		}
+		ip := ShardNodeConfs["ip"].(string)
+		port := int64(ShardNodeConfs["base_port"].(float64))
+		address := fmt.Sprintf("%s:%d", ip, port)
+		serversAddress[idx] = address
+		serversStatus[idx] = ShardNodeConfs["status"].(string)
+		serversMaxKey[idx] = int64(ShardNodeConfs["max_key"].(float64))
+		// fmt.Println(idx, ip, port)
 	}
 	*level = 0
 	statusCode.Init()
