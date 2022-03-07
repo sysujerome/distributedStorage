@@ -15,7 +15,8 @@ ps -ef | grep ./bin/client | grep -v grep | awk '{print $2}' | xargs kill -9
 # ./bin/server --shard_idx=6 &>> log &
 # ./bin/server --shard_idx=7 &>> log &
 
-count=64
+sleep 5s
+count=$1
 for i in $(seq 0  $[$count-1])
 do
     ./bin/server --shard_idx=$i &>> log &

@@ -80,6 +80,7 @@ message SyncConfRequest {
     }
     repeated ServConf server = 4;
     int64 begin = 5; //主动同步的节点
+    bool canSplit = 6;
 }
 
 message SyncConfReply {

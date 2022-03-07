@@ -114,6 +114,7 @@ func scan(operations []string) {
 		check(err)
 		conns = append(conns, conn)
 	}
+	total := 0
 	for idx := 0; idx < len(serversAddress); idx++ {
 		server := serversAddress[int64(idx)]
 		if len(operations) > 1 {
@@ -156,7 +157,9 @@ func scan(operations []string) {
 		check(err)
 		count := reply.GetCount()
 		fmt.Printf("count: %d\n\n", count)
+		total += int(count)
 	}
+	fmt.Printf("Total : %d\n", total)
 	for _, conn := range conns {
 		conn.Close()
 	}
@@ -298,7 +301,7 @@ func test() {
 	fmt.Println("set....")
 	// SET
 	for i := 0; i < len(keys); i++ {
-		if i%5000 == 0 {
+		if i%5 == 0 {
 			fmt.Printf("%d epoch...\n", i)
 		}
 		key := keys[i]
@@ -312,6 +315,7 @@ func test() {
 
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
 		defer cancel()
+		syncConf(clients[idx], ctx)
 		reply, err := clients[idx].Set(ctx, &pb.SetRequest{Key: key, Value: value})
 		if err != nil || reply.GetStatus() == statusCode.Failed {
 			fmt.Printf("%s status: %s\n", serversAddress[idx], reply.GetStatus())
@@ -322,36 +326,47 @@ func test() {
 
 	fmt.Println("get....")
 	// GET
-	failedNumber := 0
+	successNumber := 0
 	wrongNumber := 0
 	for i := 0; i < len(keys); i++ {
-		if i%5000 == 0 {
+		if i%10 == 0 {
 			fmt.Printf("%d epoch...\n", i)
 		}
 		key := keys[i]
-		value := values[i]
+		// value := values[i]
 		idx := hashFunc(key)
-		// addr := serverAddress[idx]
-		// conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
-		// check(err)
-		// defer conn.Close()
-		// c := pb.NewStorageClient(conn)
+		// found := false
 
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
 		defer cancel()
-		reply, err := clients[idx].Get(ctx, &pb.GetRequest{Key: key})
-		if err != nil || reply.GetStatus() != statusCode.Ok {
-			// fmt.Printf("status : %s\n", reply.GetStatus())
-			// panic(reply.GetErr())
-			failedNumber++
-		} else if reply.GetResult() != value {
-			// panic("Wrong value!!!")
-			wrongNumber++
+		reply, _ := clients[idx].Get(ctx, &pb.GetRequest{Key: key})
+		if reply.GetStatus() == statusCode.Ok {
+			successNumber++
 		}
+		// syncConf(clients[idx], ctx)
+		// idx := beginIdx
+		// for {
+		// 	if int(idx) == len(serversAddress) {
+		// 		idx = 0
+		// 	}
+		// 	reply, _ := clients[idx].Get(ctx, &pb.GetRequest{Key: key})
+		// 	if reply.GetStatus() == statusCode.Ok {
+		// 		found = true
+		// 		break
+		// 	}
+		// 	idx++
+		// 	if idx == beginIdx || beginIdx == 0 && idx == 16 {
+		// 		break
+		// 	}
+		// 	// fmt.Printf("%d %d", idx, beginIdx)
+		// }
+		// if !found {
+		// 	successNumber++
+		// }
 	}
 
 	fmt.Printf("Total number : %d\n", len(keys))
-	fmt.Printf("Failed number : %d\n", failedNumber)
+	fmt.Printf("Success number : %d\n", successNumber)
 	fmt.Printf("Wrong number : %d\n", wrongNumber)
 
 	for idx := 0; idx < len(serversAddress); idx++ {
@@ -482,6 +497,12 @@ func initConf() {
 	c := pb.NewStorageClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
 	defer cancel()
+	syncConf(c, ctx)
+	// printConf()
+}
+
+func syncConf(c pb.StorageClient, ctx context.Context) {
+
 	reply, err := c.GetConf(ctx, &pb.GetConfRequest{})
 	check(err)
 	if reply.GetStatus() != statusCode.Ok {
@@ -498,7 +519,6 @@ func initConf() {
 		serversMaxKey[int64(idx)] = server.MaxKey
 		serversStatus[int64(idx)] = server.Status
 	}
-	// printConf()
 }
 
 func printConf() {
@@ -530,4 +550,5 @@ func hashFunc(key string) int64 {
 		pos = posCRC16 % (int64(math.Pow(2.0, float64(level+1))) * hashSize)
 	}
 	return pos
+	// return 1
 }
