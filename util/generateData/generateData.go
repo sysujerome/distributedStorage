@@ -69,7 +69,7 @@ func check(e error) {
 // }
 
 func main() {
-	// generate_test_data()
+	generate_test_data()
 	if len(os.Args) < 2 {
 		panic("Too less argument...")
 	}
