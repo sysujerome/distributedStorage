@@ -15,7 +15,7 @@ import (
 	pb "storage/kvstore"
 	common "storage/util/common"
 	crc16 "storage/util/crc16"
-	"sync"
+	"sync/atomic"
 	"time"
 
 	"google.golang.org/grpc"
@@ -37,8 +37,8 @@ var (
 	errorCode      common.Error
 	serverStatus   common.ServerStatus
 	canSplit       bool
-	mutex          sync.Mutex
-	spliting       bool
+	// mutex          sync.Mutex
+	spliting int64
 )
 
 type server struct {
@@ -50,7 +50,7 @@ func (s *server) Get(ctx context.Context, in *pb.GetRequest) (*pb.GetReply, erro
 		return &pb.GetReply{Result: "", Status: statusCode.Failed, Err: errorCode.NotWorking}, nil
 	}
 
-	if serversStatus[*shardIdx] == serverStatus.Spliting {
+	if atomic.LoadInt64(&spliting) > 0 {
 		// operations = append(operations, []string{"get", in.GetKey()})
 		value, found := db[in.GetKey()]
 		if found {
@@ -93,7 +93,8 @@ func (s *server) Set(ctx context.Context, in *pb.SetRequest) (*pb.SetReply, erro
 
 	// log.Printf("Received get key: %v", in.GetKey())
 	// if serversStatus[*shardIdx] == serverStatus.Spliting {
-	if serversStatus[*shardIdx] == serverStatus.Spliting {
+	// if serversStatus[*shardIdx] == serverStatus.Spliting {
+	if atomic.LoadInt64(&spliting) > 0 {
 		// time.Sleep(time.Millisecond)
 		// fmt.Printf("-")
 		operations = append(operations, []string{"set", in.GetKey(), in.GetValue()})
@@ -116,7 +117,8 @@ func (s *server) Del(ctx context.Context, in *pb.DelRequest) (*pb.DelReply, erro
 	}
 
 	// log.Printf("Received get key: %v", in.GetKey())
-	if serversStatus[*shardIdx] == serverStatus.Spliting {
+	// if serversStatus[*shardIdx] == serverStatus.Spliting {
+	if atomic.LoadInt64(&spliting) > 0 {
 		operations = append(operations, []string{"del", in.GetKey()})
 		return &pb.DelReply{Result: 0, Status: statusCode.Stored, Err: errorCode.Stored}, nil
 	}
@@ -207,36 +209,48 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 			switch operation[0] {
 			case "set":
 				idx := hashFunc(operation[1])
-				target := serversAddress[idx]
-				conn, err := grpc.Dial(target, grpc.WithTransportCredentials(insecure.NewCredentials()))
-				check(err)
-				defer conn.Close()
-				c := pb.NewStorageClient(conn)
-				c.Set(ctx, &pb.SetRequest{Key: operation[1], Value: operation[2]})
+				if idx == *shardIdx {
+					db[operation[1]] = db[operation[2]]
+				} else {
+					target := serversAddress[idx]
+					conn, err := grpc.Dial(target, grpc.WithTransportCredentials(insecure.NewCredentials()))
+					check(err)
+					defer conn.Close()
+					c := pb.NewStorageClient(conn)
+					reply, err := c.Set(ctx, &pb.SetRequest{Key: operation[1], Value: operation[2]})
+					if err != nil || reply.GetStatus() != statusCode.Ok {
+						panic(reply.GetStatus())
+					}
+				}
 				// db[operation[1]] = operation[2]
 			case "del":
 				// delete(db, operation[1])
 				idx := hashFunc(operation[1])
-				target := serversAddress[idx]
-				conn, err := grpc.Dial(target, grpc.WithTransportCredentials(insecure.NewCredentials()))
-				check(err)
-				defer conn.Close()
-				c := pb.NewStorageClient(conn)
-				c.Del(ctx, &pb.DelRequest{Key: operation[1]})
+				if idx == *shardIdx {
+					db[operation[1]] = db[operation[2]]
+				} else {
+					target := serversAddress[idx]
+					conn, err := grpc.Dial(target, grpc.WithTransportCredentials(insecure.NewCredentials()))
+					check(err)
+					defer conn.Close()
+					c := pb.NewStorageClient(conn)
+					c.Del(ctx, &pb.DelRequest{Key: operation[1]})
+				}
 			}
 		}
-		// serversStatus[*shardIdx] = serverStatus.Working
+		serversStatus[*shardIdx] = serverStatus.Working
 		return int64(count), false
 	}
 
 	// mutex.Lock()
 	serversStatus[*shardIdx] = serverStatus.Spliting
+	atomic.AddInt64(&spliting, 1)
 	// mutex.Unlock()
 	count, full := splitInside()
 
 	// mutex.Lock()
 	serversStatus[*shardIdx] = serverStatus.Working
-
+	atomic.AddInt64(&spliting, -1)
 	// mutex.Unlock()
 	if full {
 		canSplit = false
@@ -380,7 +394,7 @@ func initConf() {
 	serversStatus = make(map[int64]string)
 	serversMaxKey = make(map[int64]int64)
 	canSplit = true
-	spliting = false
+	atomic.StoreInt64(&spliting, 0)
 	defer flag.Parse()
 	curPath, err := os.Getwd()
 	check(err)
