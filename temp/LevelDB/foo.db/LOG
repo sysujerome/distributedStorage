@@ -1,0 +1,43 @@
+=============== Mar 20, 2022 (CST) ===============
+13:52:10.343497 log@legend F·NumFile S·FileSize N·Entry C·BadEntry B·BadBlock Ke·KeyError D·DroppedEntry L·Level Q·SeqNum T·TimeElapsed
+13:52:10.351350 db@open opening
+13:52:10.353661 version@stat F·[] S·0B[] Sc·[]
+13:52:10.355891 db@janitor F·2 G·0
+13:52:10.355961 db@open done T·4.5327ms
+13:52:10.356258 db@close closing
+13:52:10.360020 db@close done T·3.7189ms
+=============== Mar 20, 2022 (CST) ===============
+13:52:17.696843 log@legend F·NumFile S·FileSize N·Entry C·BadEntry B·BadBlock Ke·KeyError D·DroppedEntry L·Level Q·SeqNum T·TimeElapsed
+13:52:17.697508 version@stat F·[] S·0B[] Sc·[]
+13:52:17.697542 db@open opening
+13:52:17.697655 journal@recovery F·1
+13:52:17.699442 journal@recovery recovering @1
+13:52:17.700687 version@stat F·[] S·0B[] Sc·[]
+13:52:17.713084 db@janitor F·2 G·0
+13:52:17.713124 db@open done T·15.5598ms
+13:52:17.714766 db@close closing
+13:52:17.720075 db@close done T·5.3015ms
+=============== Mar 20, 2022 (CST) ===============
+14:41:48.471816 log@legend F·NumFile S·FileSize N·Entry C·BadEntry B·BadBlock Ke·KeyError D·DroppedEntry L·Level Q·SeqNum T·TimeElapsed
+14:41:48.472502 version@stat F·[] S·0B[] Sc·[]
+14:41:48.472525 db@open opening
+14:41:48.472653 journal@recovery F·1
+14:41:48.474529 journal@recovery recovering @2
+14:41:48.487225 memdb@flush created L0@4 N·3 S·143B "fizz,v1":"fizz3,v3"
+14:41:48.488808 version@stat F·[1] S·143B[143B] Sc·[0.25]
+14:41:48.500784 db@janitor F·3 G·0
+14:41:48.500833 db@open done T·28.2876ms
+14:41:48.502507 db@close closing
+14:41:48.508406 db@close done T·5.8909ms
+=============== Mar 20, 2022 (CST) ===============
+16:04:34.192963 log@legend F·NumFile S·FileSize N·Entry C·BadEntry B·BadBlock Ke·KeyError D·DroppedEntry L·Level Q·SeqNum T·TimeElapsed
+16:04:34.193629 version@stat F·[1] S·143B[143B] Sc·[0.25]
+16:04:34.193653 db@open opening
+16:04:34.193763 journal@recovery F·1
+16:04:34.195072 journal@recovery recovering @5
+16:04:34.201936 memdb@flush created L0@7 N·3 S·143B "fizz,v5":"fizz3,v7"
+16:04:34.203203 version@stat F·[2] S·286B[286B] Sc·[0.50]
+16:04:34.218354 db@janitor F·4 G·0
+16:04:34.218396 db@open done T·24.7292ms
+16:04:34.221666 db@close closing
+16:04:34.226163 db@close done T·4.484ms
