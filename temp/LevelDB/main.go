@@ -2,8 +2,9 @@ package main
 
 import (
 	"fmt"
-	"github.com/syndtr/goleveldb/leveldb"
 	"log"
+
+	"github.com/syndtr/goleveldb/leveldb"
 )
 
 func main() {
