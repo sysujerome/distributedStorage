@@ -20,6 +20,7 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"github.com/syndtr/goleveldb/leveldb"
 )
 
 var (
@@ -38,6 +39,7 @@ var (
 	serverStatus   common.ServerStatus
 	canSplit       bool
 	// mutex          sync.Mutex
+	overflowDB *leveldb.DB
 	spliting int64
 )
 
@@ -56,27 +58,34 @@ func (s *server) Get(ctx context.Context, in *pb.GetRequest) (*pb.GetReply, erro
 		if found {
 			return &pb.GetReply{Result: value, Status: statusCode.Ok}, nil
 		} else {
-			secondIdx := int64(math.Pow(2, float64(*level)))**hashSize + *shardIdx
-			if int(secondIdx) >= len(serversAddress) {
-				return &pb.GetReply{Result: "", Status: statusCode.Failed, Err: errorCode.NotFound}, nil
-			}
-			target := serversAddress[secondIdx]
-			conn, err := grpc.Dial(target, grpc.WithTransportCredentials(insecure.NewCredentials()))
-			check(err)
-			defer conn.Close()
-			c := pb.NewStorageClient(conn)
-			// Contact the server and print out its response.
-			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
-			defer cancel()
-
-			reply, err := c.Get(ctx, &pb.GetRequest{Key: in.GetKey()})
-			check(err)
-			if reply.GetStatus() == statusCode.Ok {
-				return &pb.GetReply{Result: reply.GetResult(), Status: statusCode.Ok}, nil
+			// 从溢出表中查找
+			data, err := overflowDB.Get([]byte("key"), nil)
+			if (err != nil) {
+				return &pb.GetReply{Result: string(data), Status: statusCode.Ok}, nil
 			} else {
-				return &pb.GetReply{Result: "", Status: statusCode.Failed, Err: errorCode.NotFound}, nil
+				secondIdx := int64(math.Pow(2, float64(*level)))**hashSize + *shardIdx
+				if int(secondIdx) >= len(serversAddress) {
+					return &pb.GetReply{Result: "", Status: statusCode.Failed, Err: errorCode.NotFound}, nil
+				}
+				target := serversAddress[secondIdx]
+				conn, err := grpc.Dial(target, grpc.WithTransportCredentials(insecure.NewCredentials()))
+				check(err)
+				defer conn.Close()
+				c := pb.NewStorageClient(conn)
+				// Contact the server and print out its response.
+				ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
+				defer cancel()
+	
+				reply, err := c.Get(ctx, &pb.GetRequest{Key: in.GetKey()})
+				check(err)
+				if reply.GetStatus() == statusCode.Ok {
+					return &pb.GetReply{Result: reply.GetResult(), Status: statusCode.Ok}, nil
+				} else {
+					return &pb.GetReply{Result: "", Status: statusCode.Failed, Err: errorCode.NotFound}, nil
+				}
 			}
 		}
+		
 		return &pb.GetReply{Result: "", Status: statusCode.Stored, Err: errorCode.Stored}, nil
 	}
 	value, found := db[in.GetKey()]
@@ -101,12 +110,17 @@ func (s *server) Set(ctx context.Context, in *pb.SetRequest) (*pb.SetReply, erro
 		return &pb.SetReply{Result: "", Status: statusCode.Stored, Err: errorCode.Stored}, nil
 	}
 	// }
+	
+	if len(db) == int(serversMaxKey[*shardIdx]) {
+		err := overflowDB.Put([]byte(in.GetKey()), []byte(in.GetValue()), nil)
+		check(err)
+		if canSplit {
+			split()
+		}
+	}
 	db[in.GetKey()] = in.GetValue()
 	if db[in.GetKey()] != in.GetValue() {
 		return &pb.SetReply{Result: "", Status: statusCode.Failed, Err: errorCode.NotDefined}, nil
-	}
-	if len(db) > int(serversMaxKey[*shardIdx]) && canSplit {
-		split()
 	}
 	return &pb.SetReply{Status: statusCode.Ok}, nil
 }
@@ -178,6 +192,7 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
 		defer cancel()
 
+
 		reply, err := c.WakeUp(ctx, &pb.WakeRequest{})
 		check(err)
 		if reply.GetStatus() != statusCode.Ok {
@@ -185,6 +200,13 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 			return 0, false
 		}
 		syncConf()
+
+		thisAddress := serversAddress[secondIdx]
+		thisConn, err := grpc.Dial(thisAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		check(err)
+		defer thisConn.Close()
+		thisClient := pb.NewStorageClient(thisConn)
+		// Contact the server and print out its response.
 
 		// fmt.Printf("%s : 开始分裂....\n", serversAddress[secondIdx])
 		count := 0
@@ -201,6 +223,35 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 				count++
 			}
 		}
+		// 遍历溢出表的内容
+		iter := overflowDB.NewIterator(nil, nil)
+		for iter.Next() {
+			key := string(iter.Key())
+			value := string(iter.Value())
+			curIDX := hashFunc(string(key))
+			err := overflowDB.Delete([]byte(key), nil)
+			check(err)
+			
+			if curIDX == secondIdx {
+				reply1, err := c.Set(ctx, &pb.SetRequest{Key: key, Value: value})
+				check(err)
+				if reply1.GetStatus() != statusCode.Ok {
+					fmt.Println(reply1.GetStatus())
+					fmt.Println("出错。。。")
+					panic(reply1.GetErr())
+				}
+				count++
+			} else {
+				reply2, err := thisClient.Set(ctx, &pb.SetRequest{Key: key, Value: value})
+				check(err)
+				if reply2.GetStatus() != statusCode.Ok {
+					fmt.Println(reply2.GetStatus())
+					fmt.Println("出错。。。")
+					panic(reply2.GetErr())
+				}
+			}
+		}
+
 		serversStatus[*shardIdx] = serverStatus.Working
 		syncConf()
 		// fmt.Printf("%s : 分裂完成....\n", serversAddress[secondIdx])
@@ -390,6 +441,8 @@ func initConf() {
 	flag.Parse()
 
 	db = make(map[string]string)
+	overflowDB, _ = leveldb.OpenFile("./overflow.db", nil)
+	// check(err)
 	operations = make([][]string, 0)
 	serversAddress = make(map[int64]string)
 	serversStatus = make(map[int64]string)
