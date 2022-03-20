@@ -3,20 +3,23 @@ package main
 import (
 	"fmt"
 	"log"
+	"reflect"
 
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
 func main() {
 	db, err := leveldb.OpenFile("./foo.db", nil)
+	fmt.Println(reflect.TypeOf(db))
+	fmt.Println(reflect.TypeOf(err))
 	if err != nil {
 		log.Fatal("Yikes!")
 	}
 	defer db.Close()
 
-	//	err = db.Put([]byte("fizz"), []byte("buzz"), nil)
-	//	err = db.Put([]byte("fizz2"), []byte("buzz2"), nil)
-	//	err = db.Put([]byte("fizz3"), []byte("buzz3"), nil)
+	err = db.Put([]byte("fizz"), []byte("buzz"), nil)
+	err = db.Put([]byte("fizz2"), []byte("buzz2"), nil)
+	err = db.Put([]byte("fizz3"), []byte("buzz3"), nil)
 
 	iter := db.NewIterator(nil, nil)
 	for iter.Next() {
