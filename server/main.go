@@ -132,7 +132,8 @@ func (s *server) Del(ctx context.Context, in *pb.DelRequest) (*pb.DelReply, erro
 
 func split() {
 	if *next >= int64(len(serversAddress)) {
-		fmt.Println("分裂失败, 节点满了。。。")
+		// fmt.Println("分裂失败, 节点满了。。。")
+		return
 	}
 	addr := serversAddress[*next]
 	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -146,7 +147,7 @@ func split() {
 	reply, err := c.Split(ctx, &pb.SplitRequest{})
 	check(err)
 	if reply.GetFull() {
-		fmt.Println("分裂失败, 节点满了。。。")
+		// fmt.Println("分裂失败, 节点满了。。。")
 	}
 }
 
@@ -154,10 +155,10 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 	// log.Printf("Received get key: %v", in.GetKey())
 
 	splitInside := func() (int64, bool) { // 内部元素分裂
-		fmt.Printf("%s : 节点分裂中....\n", serversAddress[*shardIdx])
+		// fmt.Printf("%s : 节点分裂中....\n", serversAddress[*shardIdx])
 		secondIdx := int64(math.Pow(2, float64(*level)))**hashSize + *shardIdx
 		if secondIdx >= int64(len(serversAddress)) {
-			fmt.Printf("%s : 节点数满了....\n", serversAddress[*shardIdx])
+			// fmt.Printf("%s : 节点数满了....\n", serversAddress[*shardIdx])
 			// canSplit = false
 			return 0, true
 		}
@@ -180,12 +181,12 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 		reply, err := c.WakeUp(ctx, &pb.WakeRequest{})
 		check(err)
 		if reply.GetStatus() != statusCode.Ok {
-			fmt.Printf("%s %s : 节点唤醒失败....\n", serversAddress[*shardIdx], serversAddress[secondIdx])
+			// fmt.Printf("%s %s : 节点唤醒失败....\n", serversAddress[*shardIdx], serversAddress[secondIdx])
 			return 0, false
 		}
 		syncConf()
 
-		fmt.Printf("%s : 开始分裂....\n", serversAddress[secondIdx])
+		// fmt.Printf("%s : 开始分裂....\n", serversAddress[secondIdx])
 		count := 0
 		for key, value := range db {
 			if hashFunc(key) == secondIdx {
@@ -202,9 +203,9 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 		}
 		serversStatus[*shardIdx] = serverStatus.Working
 		syncConf()
-		fmt.Printf("%s : 分裂完成....\n", serversAddress[secondIdx])
+		// fmt.Printf("%s : 分裂完成....\n", serversAddress[secondIdx])
 		// 处理存起来的操作
-		fmt.Println("处理存起来的操作...")
+		// fmt.Println("处理存起来的操作...")
 		for _, operation := range operations {
 			switch operation[0] {
 			case "set":

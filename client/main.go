@@ -50,7 +50,6 @@ func main() {
 	flag.Parse()
 	initConf()
 
-	// printConf()
 	var conns []*grpc.ClientConn
 	for _, addr := range serversAddress {
 		conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -239,7 +238,7 @@ func test() {
 	serverStatus := make(map[int64]string)
 	serverMaxKey := make(map[int64]int64)
 
-	address := "192.168.1.128:50050"
+	address := serversAddress[0]
 	conn, err := grpc.Dial(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	check(err)
 	defer conn.Close()
@@ -300,9 +299,10 @@ func test() {
 	}
 	fmt.Println("set....")
 	// SET
+	start := time.Now()
 	for i := 0; i < len(keys); i++ {
 		if i%5 == 0 {
-			fmt.Printf("%d epoch...\n", i)
+			// fmt.Printf("%d epoch...\n", i)
 		}
 		key := keys[i]
 		value := values[i]
@@ -317,21 +317,25 @@ func test() {
 		defer cancel()
 		syncConf(clients[idx], ctx)
 		reply, err := clients[idx].Set(ctx, &pb.SetRequest{Key: key, Value: value})
+		check(err)
 		if err != nil || reply.GetStatus() == statusCode.Failed {
 			fmt.Printf("%s status: %s\n", serversAddress[idx], reply.GetStatus())
 			panic(reply.GetErr())
 		}
 		// fmt.Println(reply.GetStatus())
 	}
+	elapse := time.Since(start)
+	fmt.Printf("Set %d keys took %s\n", len(keys), elapse)
 
 	fmt.Println("get....")
 	// GET
 	successNumber := 0
 	wrongNumber := 0
+	start = time.Now()
 	for i := 0; i < len(keys); i++ {
-		if i%10 == 0 {
-			fmt.Printf("%d epoch...\n", i)
-		}
+		// if i%10 == 0 {
+		// 	fmt.Printf("%d epoch...\n", i)
+		// }
 		key := keys[i]
 		// value := values[i]
 		idx := hashFunc(key)
@@ -364,6 +368,8 @@ func test() {
 		// 	successNumber++
 		// }
 	}
+	elapse = time.Since(start)
+	fmt.Printf("Get %d keys took %s\n", len(keys), elapse)
 
 	fmt.Printf("Total number : %d\n", len(keys))
 	fmt.Printf("Success number : %d\n", successNumber)

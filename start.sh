@@ -26,3 +26,21 @@ echo
 
 # ./bin/client --ip=192.168.1.128 --port=50050
 echo "---------" >> log
+
+
+rsync -av ./distributedStorage thu@cn16608:~
+rsync -av ./distributedStorage thu@cn16609:~
+rsync -av ./distributedStorage thu@cn16610:~
+rsync -av ./distributedStorage thu@cn16611:~
+rsync -av ./distributedStorage thu@cn16612:~
+rsync -av ./distributedStorage thu@cn16613:~
+rsync -av ./distributedStorage thu@cn16614:~
+rsync -av ./distributedStorage thu@cn16615:~
+rsync -av ./distributedStorage thu@cn16616:~
+rsync -av ./distributedStorage thu@cn16617:~
+rsync -av ./distributedStorage thu@cn16618:~
+rsync -av ./distributedStorage thu@cn16619:~
+rsync -av ./distributedStorage thu@cn16620:~
+rsync -av ./distributedStorage thu@cn16621:~
+rsync -av ./distributedStorage thu@cn16622:~
+

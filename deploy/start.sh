@@ -1,0 +1,1 @@
+./bin/server --shard_idx=$1 &
