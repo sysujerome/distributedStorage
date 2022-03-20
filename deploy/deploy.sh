@@ -31,6 +31,8 @@ cluster_name=(
 
 path="/home/thu/distributedStorage"
 
+# go build -o ./bin/client ./client/main.go
+# go build -o ./bin/server ./server/main.go
 ./deploy/sync.sh
 
 for idx in $(seq 0 11)
