@@ -37,36 +37,6 @@ func check(e error) {
 	}
 }
 
-// func main() {
-// 	// you need to ensure that the base directory exists, because os.Create does not handle it.
-// 	// err := os.WriteFile("pangjinglongtmpfile", []byte(RandStringRunes(10)), 0644)
-// 	flag.Parse()
-// 	path, _ := os.Getwd()
-// 	filename := filepath.Join(path, "/data/benchmark_data")
-// 	f, err := os.Create(filename)
-// 	newline := ""
-// 	var key, value string
-// 	check(err)
-// 	defer f.Close()
-// 	length, err := strconv.ParseInt(os.Args[1], 0, 64)
-// 	check(err)
-// 	for i := 0; i < int(length); i++ {
-// 		opt := operators[rand.Intn(len(operators))]
-// 		switch opt {
-// 		case "get":
-// 			key = RandStringRunes(10)
-// 			f.WriteString(newline + opt + " " + key)
-// 		case "set":
-// 			key = RandStringRunes(10)
-// 			value = RandStringRunes(10)
-// 			f.WriteString(newline + opt + " " + key + " " + value)
-// 		case "del":
-// 			key = RandStringRunes(10)
-// 			f.WriteString(newline + opt + " " + key)
-// 		}
-// 		newline = "\n"
-// 	}
-// }
 
 func main() {
 	generate_test_data()
@@ -84,7 +54,7 @@ func generate_test_data() {
 	check(err)
 	defer wirter.Close()
 
-	length := 10 * 10000
+	length,_ := strconv.Atoi(os.Args[1])
 	newline := ""
 	for i := 0; i < length; i++ {
 		key := RandStringRunes(10)
@@ -95,21 +65,7 @@ func generate_test_data() {
 }
 
 func generate_conf(count int) {
-	// {
-	// 	"next":0,
-	// 	"level":0,
-	// 	"shard_confs":[
-	// 		{
-	// 			"shard_idx" :0,
-	// 			"shard_node_confs" : {
-	// 				"shard_node_0":  {
-	// 					"ip":"192.168.1.128",
-	// 					"base_port":50050,
-	// 					"status":"working",
-	// 					"max_key":1000
-	// 				}
-	// 			}
-	// 		},
+
 	type ShardNodeConf struct {
 		IP       string `json:"ip"`
 		BasePort int    `json:"base_port"`
@@ -150,10 +106,6 @@ func generate_conf(count int) {
 		shardConf.IP = "192.168.1.128"
 		shardConf.BasePort = 50050 + i
 		shardConf.MaxKey = 1000
-		// Working  string
-		// Sleep    string
-		// Spliting string
-		// Full     string
 		shardConf.Status = serverStatus.Sleep
 		if i < 4 {
 			shardConf.Status = serverStatus.Working

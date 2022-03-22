@@ -41,3 +41,88 @@
 16:04:34.218396 db@open done T·24.7292ms
 16:04:34.221666 db@close closing
 16:04:34.226163 db@close done T·4.484ms
+=============== Mar 20, 2022 (CST) ===============
+22:00:05.838275 log@legend F·NumFile S·FileSize N·Entry C·BadEntry B·BadBlock Ke·KeyError D·DroppedEntry L·Level Q·SeqNum T·TimeElapsed
+22:00:05.838997 version@stat F·[2] S·286B[286B] Sc·[0.50]
+22:00:05.839026 db@open opening
+22:00:05.839205 journal@recovery F·1
+22:00:05.840971 journal@recovery recovering @8
+22:00:05.848922 memdb@flush created L0@10 N·3 S·143B "fizz,v9":"fizz3,v11"
+22:00:05.850350 version@stat F·[3] S·429B[429B] Sc·[0.75]
+22:00:05.866595 db@janitor F·5 G·0
+22:00:05.866644 db@open done T·27.6038ms
+22:00:05.868584 db@close closing
+22:00:05.874564 db@close done T·5.9693ms
+=============== Mar 20, 2022 (CST) ===============
+22:01:45.533373 log@legend F·NumFile S·FileSize N·Entry C·BadEntry B·BadBlock Ke·KeyError D·DroppedEntry L·Level Q·SeqNum T·TimeElapsed
+22:01:45.534069 version@stat F·[3] S·429B[429B] Sc·[0.75]
+22:01:45.534092 db@open opening
+22:01:45.534202 journal@recovery F·1
+22:01:45.535564 journal@recovery recovering @11
+22:01:45.546327 memdb@flush created L0@13 N·3 S·143B "fizz,v13":"fizz3,v15"
+22:01:45.547445 version@stat F·[4] S·572B[572B] Sc·[1.00]
+22:01:45.558071 db@janitor F·6 G·0
+22:01:45.558122 db@open done T·24.0026ms
+22:01:45.558458 table@compaction L0·4 -> L1·0 S·572B Q·16
+22:01:45.560196 db@close closing
+22:01:45.562468 table@build created L1@16 N·3 S·143B "fizz,v13":"fizz3,v15"
+22:01:45.562510 table@build exiting
+22:01:45.562524 table@build revert @16
+22:01:45.567571 db@close done T·7.3679ms
+=============== Mar 20, 2022 (CST) ===============
+22:02:11.239307 log@legend F·NumFile S·FileSize N·Entry C·BadEntry B·BadBlock Ke·KeyError D·DroppedEntry L·Level Q·SeqNum T·TimeElapsed
+22:02:11.240032 version@stat F·[4] S·572B[572B] Sc·[1.00]
+22:02:11.240096 db@open opening
+22:02:11.240227 journal@recovery F·1
+22:02:11.241341 journal@recovery recovering @14
+22:02:11.252213 memdb@flush created L0@16 N·3 S·143B "fizz,v17":"fizz3,v19"
+22:02:11.253849 version@stat F·[5] S·715B[715B] Sc·[1.25]
+22:02:11.266414 db@janitor F·7 G·0
+22:02:11.266454 db@open done T·26.3402ms
+22:02:11.266606 table@compaction L0·5 -> L1·0 S·715B Q·20
+22:02:11.271072 table@build created L1@19 N·3 S·143B "fizz,v17":"fizz3,v19"
+22:02:11.271157 version@stat F·[0 1] S·143B[0B 143B] Sc·[0.00 0.00]
+22:02:11.271273 db@close closing
+22:02:11.273322 table@commit exiting
+22:02:11.273690 table@remove removed @16
+22:02:11.273940 table@remove removed @13
+22:02:11.274203 table@remove removed @10
+22:02:11.274511 table@remove removed @7
+22:02:11.274755 table@remove removed @4
+22:02:11.280039 db@close done T·8.7584ms
+=============== Mar 20, 2022 (CST) ===============
+22:02:25.046824 log@legend F·NumFile S·FileSize N·Entry C·BadEntry B·BadBlock Ke·KeyError D·DroppedEntry L·Level Q·SeqNum T·TimeElapsed
+22:02:25.047508 version@stat F·[0 1] S·143B[0B 143B] Sc·[0.00 0.00]
+22:02:25.047530 db@open opening
+22:02:25.047636 journal@recovery F·1
+22:02:25.049114 journal@recovery recovering @17
+22:02:25.060838 memdb@flush created L0@20 N·3 S·143B "fizz,v21":"fizz3,v23"
+22:02:25.061820 version@stat F·[1 1] S·286B[143B 143B] Sc·[0.25 0.00]
+22:02:25.073364 db@janitor F·4 G·0
+22:02:25.073401 db@open done T·25.8554ms
+22:02:25.077207 db@close closing
+22:02:25.081979 db@close done T·4.7629ms
+=============== Mar 20, 2022 (CST) ===============
+22:03:10.576311 log@legend F·NumFile S·FileSize N·Entry C·BadEntry B·BadBlock Ke·KeyError D·DroppedEntry L·Level Q·SeqNum T·TimeElapsed
+22:03:10.576999 version@stat F·[1 1] S·286B[143B 143B] Sc·[0.25 0.00]
+22:03:10.577022 db@open opening
+22:03:10.577134 journal@recovery F·1
+22:03:10.578058 journal@recovery recovering @21
+22:03:10.589996 memdb@flush created L0@23 N·3 S·143B "fizz,v25":"fizz3,v27"
+22:03:10.591318 version@stat F·[2 1] S·429B[286B 143B] Sc·[0.50 0.00]
+22:03:10.602895 db@janitor F·5 G·0
+22:03:10.602966 db@open done T·25.9286ms
+22:03:10.607551 db@close closing
+22:03:10.611862 db@close done T·4.3034ms
+=============== Mar 20, 2022 (CST) ===============
+22:03:21.656916 log@legend F·NumFile S·FileSize N·Entry C·BadEntry B·BadBlock Ke·KeyError D·DroppedEntry L·Level Q·SeqNum T·TimeElapsed
+22:03:21.657601 version@stat F·[2 1] S·429B[286B 143B] Sc·[0.50 0.00]
+22:03:21.657624 db@open opening
+22:03:21.657732 journal@recovery F·1
+22:03:21.658736 journal@recovery recovering @24
+22:03:21.671424 memdb@flush created L0@26 N·3 S·143B "fizz,v29":"fizz3,v31"
+22:03:21.673212 version@stat F·[3 1] S·572B[429B 143B] Sc·[0.75 0.00]
+22:03:21.685487 db@janitor F·6 G·0
+22:03:21.685597 db@open done T·27.9494ms
+22:03:21.689900 db@close closing
+22:03:21.694880 db@close done T·4.9705ms

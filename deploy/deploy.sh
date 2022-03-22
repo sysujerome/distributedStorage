@@ -35,17 +35,18 @@ path="/home/thu/distributedStorage"
 # go build -o ./bin/server ./server/main.go
 ./deploy/sync.sh
 
-for idx in $(seq 0 11)
+for idx in $(seq 0 3)
 do
 
-        ssh -t -t ${cluster_name[${idx}]} << EOF
-        cd ${path}
-        chmod +x ./deploy/shutdown.sh
-        chmod +x ./deploy/start.sh
-        ./deploy/shutdown.sh
-        ./deploy/start.sh ${idx}
-
+    ssh -t -t ${cluster_name[${idx}]} << EOF
+    cd ${path}
+    chmod +x ./deploy/shutdown.sh
+    chmod +x ./deploy/start.sh
+    rm -rf ./overflow.db
+    ./deploy/shutdown.sh
+    ./deploy/start.sh ${idx} &> log
+    exit
 EOF
 
 done
-
+chmod +x ./bin/client

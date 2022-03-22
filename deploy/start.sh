@@ -1,1 +1,1 @@
-./bin/server --shard_idx=$1 &
+./bin/server --shard_idx=$1 & >> log

@@ -45,4 +45,15 @@ func main() {
 
 	iter.Release()
 	err = iter.Error()
+
+
+	data, err := db.Get([]byte("fizz2"), nil)
+	fmt.Println(string(data))
+	fmt.Println(err)
+	data, err = db.Get([]byte("dasd"), nil)
+	if err == nil {
+		return
+	}
+	fmt.Println(string(data))
+	fmt.Println(err)
 }
