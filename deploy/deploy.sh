@@ -27,6 +27,10 @@ cluster_name=(
     "thu@cn16620"
     "thu@cn16621"
     "thu@cn16622"
+    "thu@cn16607"
+    "thu@cn16608"
+    "thu@cn16609"
+    "thu@cn16610"
 )
 
 path="/home/thu/distributedStorage"
@@ -35,7 +39,7 @@ path="/home/thu/distributedStorage"
 # go build -o ./bin/server ./server/main.go
 ./deploy/sync.sh
 
-for idx in $(seq 0 3)
+for idx in $(seq 0 11)
 do
 
     ssh -t -t ${cluster_name[${idx}]} << EOF

@@ -121,6 +121,46 @@
 				"status": "sleep",
 				"max_key": 1000
 			}
+		},
+		{
+			"shard_idx": 12,
+			"shard_node_name": "shard_node_11",
+			"shard_node_confs": {
+				"ip": "10.182.183.1",
+				"base_port": 50062,
+				"status": "sleep",
+				"max_key": 1000
+			}
+		},
+		{
+			"shard_idx": 13,
+			"shard_node_name": "shard_node_11",
+			"shard_node_confs": {
+				"ip": "10.182.183.2",
+				"base_port": 50063,
+				"status": "sleep",
+				"max_key": 1000
+			}
+		},
+		{
+			"shard_idx": 14,
+			"shard_node_name": "shard_node_11",
+			"shard_node_confs": {
+				"ip": "10.182.183.3",
+				"base_port": 50064,
+				"status": "sleep",
+				"max_key": 1000
+			}
+		},
+		{
+			"shard_idx": 15,
+			"shard_node_name": "shard_node_11",
+			"shard_node_confs": {
+				"ip": "10.182.183.4",
+				"base_port": 50065,
+				"status": "sleep",
+				"max_key": 1000
+			}
 		}
 	]
 }

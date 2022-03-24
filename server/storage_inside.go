@@ -59,10 +59,10 @@ func (s *server) Get(ctx context.Context, in *pb.GetRequest) (*pb.GetReply, erro
 			return &pb.GetReply{Result: value, Status: statusCode.Ok}, nil
 		} else {
 			// 从溢出表中查找
-			data, err := overflowDB.Get([]byte("key"), nil)
-			if (err != nil) {
-				return &pb.GetReply{Result: string(data), Status: statusCode.Ok}, nil
-			} else {
+			// data, err := overflowDB.Get([]byte("key"), nil)
+			// if (err != nil) {
+			// 	return &pb.GetReply{Result: string(data), Status: statusCode.Ok}, nil
+			// } else {
 				secondIdx := int64(math.Pow(2, float64(*level)))**hashSize + *shardIdx
 				if int(secondIdx) >= len(serversAddress) {
 					return &pb.GetReply{Result: "", Status: statusCode.Failed, Err: errorCode.NotFound}, nil
@@ -83,17 +83,17 @@ func (s *server) Get(ctx context.Context, in *pb.GetRequest) (*pb.GetReply, erro
 				} else {
 					return &pb.GetReply{Result: "", Status: statusCode.Failed, Err: errorCode.NotFound}, nil
 				}
-			}
+			// }
 		}
 		
 		return &pb.GetReply{Result: "", Status: statusCode.Stored, Err: errorCode.Stored}, nil
 	}
 	value, found := db[in.GetKey()]
 	if !found {
-		data, err := overflowDB.Get([]byte(in.GetKey()), nil)
-		if err != nil {
-			return &pb.GetReply{Result: "", Err: errorCode.NotFound, Status: statusCode.Failed}, nil
-		}
+		// data, err := overflowDB.Get([]byte(in.GetKey()), nil)
+		// if err != nil {
+		// 	return &pb.GetReply{Result: "", Err: errorCode.NotFound, Status: statusCode.Failed}, nil
+		// }
 		return &pb.GetReply{Result: string(data), Err: "", Status: statusCode.Ok}, nil
 	}
 	return &pb.GetReply{Result: value, Status: statusCode.Ok}, nil
@@ -104,9 +104,6 @@ func (s *server) Set(ctx context.Context, in *pb.SetRequest) (*pb.SetReply, erro
 		return &pb.SetReply{Result: "", Status: statusCode.Failed, Err: errorCode.NotWorking}, nil
 	}
 
-	// log.Printf("Received get key: %v", in.GetKey())
-	// if serversStatus[*shardIdx] == serverStatus.Spliting {
-	// if serversStatus[*shardIdx] == serverStatus.Spliting {
 	if atomic.LoadInt64(&spliting) > 0 {
 		// time.Sleep(time.Millisecond)
 		// fmt.Printf("-")
@@ -150,7 +147,7 @@ func (s *server) Del(ctx context.Context, in *pb.DelRequest) (*pb.DelReply, erro
 
 func split() {
 	if *next >= int64(len(serversAddress)) {
-		// fmt.Println("分裂失败, 节点满了。。。")
+		fmt.Println("分裂失败, 节点满了。。。")
 		return
 	}
 	addr := serversAddress[*next]
@@ -159,33 +156,33 @@ func split() {
 	defer conn.Close()
 	c := pb.NewStorageClient(conn)
 	// Contact the server and print out its response.
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Minute))
 	defer cancel()
 
 	reply, err := c.Split(ctx, &pb.SplitRequest{})
 	check(err)
 	if reply.GetFull() {
-		// fmt.Println("分裂失败, 节点满了。。。")
+		fmt.Println("分裂失败, 节点满了。。。")
 	}
 }
 
 func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply, error) {
 	// log.Printf("Received get key: %v", in.GetKey())
 
-	splitInside := func() (int64, bool) { // 内部元素分裂
-		// fmt.Printf("%s : 节点分裂中....\n", serversAddress[*shardIdx])
+	splitInside := func() { // 内部元素分裂
+		fmt.Printf("%s : 节点分裂中....\n", serversAddress[*shardIdx])
 		secondIdx := int64(math.Pow(2, float64(*level)))**hashSize + *shardIdx
 		if secondIdx >= int64(len(serversAddress)) {
-			// fmt.Printf("%s : 节点数满了....\n", serversAddress[*shardIdx])
-			// canSplit = false
-			return 0, true
+			fmt.Printf("%s : 节点数满了....\n", serversAddress[*shardIdx])
+			canSplit = false
+			return
 		}
 
 		*next++
 		if *next == int64(math.Pow(2, float64(*level)))**hashSize {
 			*next = 0
 			*level++
-		}
+		}	
 		syncConf()
 		target := serversAddress[secondIdx]
 		conn, err := grpc.Dial(target, grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -201,7 +198,7 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 		check(err)
 		if reply.GetStatus() != statusCode.Ok {
 			// fmt.Printf("%s %s : 节点唤醒失败....\n", serversAddress[*shardIdx], serversAddress[secondIdx])
-			return 0, false
+			return
 		}
 		syncConf()
 
@@ -212,7 +209,7 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 		thisClient := pb.NewStorageClient(thisConn)
 		// Contact the server and print out its response.
 
-		// fmt.Printf("%s : 开始分裂....\n", serversAddress[secondIdx])
+		fmt.Printf("%s : 开始分裂....\n", serversAddress[secondIdx])
 		count := 0
 		for key, value := range db {
 			if hashFunc(key) == secondIdx {
@@ -258,9 +255,9 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 
 		serversStatus[*shardIdx] = serverStatus.Working
 		syncConf()
-		// fmt.Printf("%s : 分裂完成....\n", serversAddress[secondIdx])
+		fmt.Printf("%s : 分裂完成....\n", serversAddress[secondIdx])
 		// 处理存起来的操作
-		// fmt.Println("处理存起来的操作...")
+		fmt.Println("处理存起来的操作...")
 		for _, operation := range operations {
 			switch operation[0] {
 			case "set":
@@ -295,32 +292,28 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 			}
 		}
 		serversStatus[*shardIdx] = serverStatus.Working
-		return int64(count), false
+		return 
 	}
 
 	// mutex.Lock()
 	serversStatus[*shardIdx] = serverStatus.Spliting
 	atomic.AddInt64(&spliting, 1)
 	// mutex.Unlock()
-	count, full := splitInside()
+	go splitInside()
 
 	// mutex.Lock()
 	serversStatus[*shardIdx] = serverStatus.Working
 	atomic.AddInt64(&spliting, -1)
 	// mutex.Unlock()
-	if full {
-		canSplit = false
-		syncConf()
-		return &pb.SplitReply{Status: statusCode.Ok, Result: 0, Full: true}, nil
-	}
+	// if full {
+	// 	canSplit = false
+	// 	syncConf()
+	// 	return &pb.SplitReply{Status: statusCode.Ok, Result: 0, Full: true}, nil
+	// }
 
-	return &pb.SplitReply{Status: statusCode.Ok, Result: count}, nil
+	return &pb.SplitReply{Status: statusCode.Ok}, nil
 }
 
-// func GetSpliting() {
-// 	mutex.Lock()
-
-// }
 
 func (s *server) Scan(ctx context.Context, in *pb.ScanRequest) (*pb.ScanReply, error) {
 	count := len(db)
@@ -366,7 +359,7 @@ func (s *server) SyncConf(ctx context.Context, in *pb.SyncConfRequest) (*pb.Sync
 	if in.GetBegin() == *shardIdx {
 		return &pb.SyncConfReply{Status: statusCode.Ok, Result: "The sync idx has come to begin!"}, nil
 	}
-	// fmt.Printf("%s : 节点同步中...\n", serversAddress[*shardIdx])
+	fmt.Printf("%s : 节点同步中...\n", serversAddress[*shardIdx])
 	*next = in.GetNext()
 	*level = in.GetLevel()
 	*hashSize = in.GetHashSize()
