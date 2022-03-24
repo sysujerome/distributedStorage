@@ -33,7 +33,7 @@ type conf struct {
 }
 
 func main() {
-	confName := "conf_temp.json"
+	confName := "conf_isee.json"
 	path, err := os.Getwd()
 	check(err)
 	fileName := filepath.Join(path, confName)
@@ -47,7 +47,7 @@ func main() {
 	statusCode.Init()
 	errorCode.Init()
 	serverStatus.Init()
-	count := 8
+	count := 16
 	shards := make([]*shardConfs, 0)
 	for i := 0; i < count; i++ {
 		shard := new(shardConfs)
