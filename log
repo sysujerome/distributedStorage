@@ -1,15 +1,17 @@
 
-Usage:
- kill [options] <pid> [...]
-
-Options:
- <pid> [...]            send signal to every <pid> listed
- -<signal>, -s, --signal <signal>
-                        specify the <signal> to be sent
- -l, --list=[<signal>]  list all signal names, or convert one to a name
- -L, --table            list all signal names in a nice table
-
- -h, --help     display this help and exit
- -V, --version  output version information and exit
-
-For more details see kill(1).
+2022/03/25 13:21:36 server listening at 192.168.1.128:50050
+2022/03/25 13:21:36 server listening at 192.168.1.128:50053
+2022/03/25 13:21:36 server listening at 192.168.1.128:50055
+2022/03/25 13:21:36 server listening at 192.168.1.128:50054
+2022/03/25 13:21:36 server listening at 192.168.1.128:50057
+2022/03/25 13:21:36 server listening at 192.168.1.128:50059
+2022/03/25 13:21:36 server listening at 192.168.1.128:50058
+2022/03/25 13:21:36 server listening at 192.168.1.128:50060
+2022/03/25 13:21:36 server listening at 192.168.1.128:50052
+2022/03/25 13:21:36 server listening at 192.168.1.128:50063
+2022/03/25 13:21:36 server listening at 192.168.1.128:50056
+2022/03/25 13:21:36 server listening at 192.168.1.128:50065
+2022/03/25 13:21:36 server listening at 192.168.1.128:50061
+2022/03/25 13:21:36 server listening at 192.168.1.128:50062
+2022/03/25 13:21:36 server listening at 192.168.1.128:50064
+2022/03/25 13:21:36 server listening at 192.168.1.128:50051
