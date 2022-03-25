@@ -24,6 +24,8 @@ message SetReply {
     string err = 1;
     string status = 2;
     string result = 3;
+    int64 target = 4; // moved, 此key真正的存储节点
+    int64 version = 5;
 }
 
 message GetRequest {
@@ -34,6 +36,8 @@ message GetReply {
     string err = 1;
     string status = 2;
     string result = 3;
+    int64 target = 4; // moved, 此key真正的存储节点
+    int64 version = 5;
 }
 
 message DelRequest {
@@ -44,6 +48,8 @@ message DelReply {
     string err = 1;
     string status = 2;
     int64 result = 3;
+    int64 target = 4; // moved, 此key真正的存储节点
+    int64 version = 5;
 }
 
 message SplitRequest {
@@ -55,6 +61,7 @@ message SplitReply {
     string status = 2;
     int64 result = 3;
     bool full = 4;
+    int64 version = 5;
 }
 
 message ScanRequest {
@@ -66,6 +73,7 @@ message ScanReply {
     string status = 2;
     string result = 3;
     int64 count = 4;
+    int64 version = 5;
 }
 
 message SyncConfRequest {
@@ -87,6 +95,7 @@ message SyncConfReply {
     string err = 1;
     string status = 2;
     string result = 3;
+    int64 version = 4;
 }
 
 message GetConfRequest {
@@ -107,6 +116,7 @@ message GetConfReply {
         int64 maxKey = 4;
     }
     repeated ServConf server = 7;
+    int64 version = 8;
 }
 
 
@@ -118,4 +128,5 @@ message WakeReply {
     string err = 1;
     string status = 2;
     string result = 3;
+    int64 version = 4;
 }

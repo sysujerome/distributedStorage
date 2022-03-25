@@ -38,6 +38,7 @@ var (
 	statusCode     commom.Status
 	errorCode      commom.Error
 	serverStatus   common.ServerStatus
+	version        int64
 )
 
 func check(e error) {
@@ -209,6 +210,7 @@ func get(operations []string) {
 		check(err)
 		conns = append(conns, conn)
 	}
+
 	idx := hashFunc(key)
 	fmt.Printf("idx: %d\n", idx)
 	c := pb.NewStorageClient(conns[idx])
@@ -243,7 +245,7 @@ func test() {
 	check(err)
 	defer conn.Close()
 	c := pb.NewStorageClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Minute))
 	defer cancel()
 	reply, err := c.GetConf(ctx, &pb.GetConfRequest{})
 	check(err)
@@ -251,15 +253,16 @@ func test() {
 		fmt.Println("同步服务器配置出错...")
 	}
 
-	next := reply.GetNext()
-	level := reply.GetLevel()
-	hashSize := reply.GetHashSize()
+	next = reply.GetNext()
+	level = reply.GetLevel()
+	hashSize = reply.GetHashSize()
 	for _, server := range reply.GetServer() {
 		idx := server.Idx
 		serverAddress[idx] = server.Address
 		serverMaxKey[idx] = server.MaxKey
 		serverStatus[idx] = server.Status
 	}
+	version = reply.GetVersion()
 
 	var conns []*grpc.ClientConn
 	var clients []pb.StorageClient
@@ -270,15 +273,6 @@ func test() {
 		conns = append(conns, conn)
 		c := pb.NewStorageClient(conn)
 		clients = append(clients, c)
-	}
-
-	hashFunc := func(key string) int64 {
-		posCRC16 := int64(crc16.Checksum([]byte(key), crc16.IBMTable))
-		pos := posCRC16 % (int64(math.Pow(2.0, float64(level))) * hashSize)
-		if pos < next { // 分裂过了的
-			pos = posCRC16 % (int64(math.Pow(2.0, float64(level+1))) * hashSize)
-		}
-		return pos
 	}
 
 	keys := []string{}
@@ -306,7 +300,6 @@ func test() {
 		}
 		key := keys[i]
 		value := values[i]
-		idx := hashFunc(key)
 		// addr := serverAddress[idx]
 		// conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		// check(err)d
@@ -315,12 +308,32 @@ func test() {
 
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
 		defer cancel()
-		syncConf(clients[idx], ctx)
+		// 每次都要同步配置文件
+		// syncConf(clients[0], ctx)
+		idx := hashFunc(key)
 		reply, err := clients[idx].Set(ctx, &pb.SetRequest{Key: key, Value: value})
 		check(err)
+		if reply.GetVersion() != version {
+			syncConf(clients[idx], ctx)
+		}
 		if err != nil || reply.GetStatus() == statusCode.Failed {
 			fmt.Printf("%s status: %s\n", serversAddress[idx], reply.GetStatus())
 			panic(reply.GetErr())
+		}
+
+		// 如果出现moved状态码，说明集群状态已经改变，需要同步配置文件
+		if reply.GetStatus() == statusCode.Moved {
+			target := reply.GetTarget()
+			reply1, err := clients[target].Set(ctx, &pb.SetRequest{Key: key, Value: value})
+			check(err)
+			if err != nil || reply1.GetStatus() == statusCode.Failed {
+				fmt.Printf("%s status: %s\n", serversAddress[target], reply1.GetStatus())
+				panic(reply1.GetErr())
+			}
+			syncConf(clients[target], ctx)
+		}
+		if reply.GetVersion() != version {
+			syncConf(clients[idx], ctx)
 		}
 		// fmt.Println(reply.GetStatus())
 	}
@@ -331,6 +344,7 @@ func test() {
 	// GET
 	successNumber := 0
 	wrongNumber := 0
+	syncConf(clients[0], ctx)
 	start = time.Now()
 	for i := 0; i < len(keys); i++ {
 		// if i%10 == 0 {
@@ -344,29 +358,10 @@ func test() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
 		defer cancel()
 		reply, _ := clients[idx].Get(ctx, &pb.GetRequest{Key: key})
+		// if reply.GetStatus() == statusCode.Ok && reply.GetResult() == values[i] {
 		if reply.GetStatus() == statusCode.Ok {
 			successNumber++
 		}
-		// syncConf(clients[idx], ctx)
-		// idx := beginIdx
-		// for {
-		// 	if int(idx) == len(serversAddress) {
-		// 		idx = 0
-		// 	}
-		// 	reply, _ := clients[idx].Get(ctx, &pb.GetRequest{Key: key})
-		// 	if reply.GetStatus() == statusCode.Ok {
-		// 		found = true
-		// 		break
-		// 	}
-		// 	idx++
-		// 	if idx == beginIdx || beginIdx == 0 && idx == 16 {
-		// 		break
-		// 	}
-		// 	// fmt.Printf("%d %d", idx, beginIdx)
-		// }
-		// if !found {
-		// 	successNumber++
-		// }
 	}
 	elapse = time.Since(start)
 	fmt.Printf("Get %d keys took %s\n", len(keys), elapse)
@@ -525,6 +520,7 @@ func syncConf(c pb.StorageClient, ctx context.Context) {
 		serversMaxKey[int64(idx)] = server.MaxKey
 		serversStatus[int64(idx)] = server.Status
 	}
+	version = reply.GetVersion()
 }
 
 func printConf() {
