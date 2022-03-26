@@ -324,13 +324,13 @@ func test() {
 		// 如果出现moved状态码，说明集群状态已经改变，需要同步配置文件
 		if reply.GetStatus() == statusCode.Moved {
 			target := reply.GetTarget()
+			syncConf(clients[target], ctx)
 			reply1, err := clients[target].Set(ctx, &pb.SetRequest{Key: key, Value: value})
 			check(err)
 			if err != nil || reply1.GetStatus() == statusCode.Failed {
 				fmt.Printf("%s status: %s\n", serversAddress[target], reply1.GetStatus())
 				panic(reply1.GetErr())
 			}
-			syncConf(clients[target], ctx)
 		}
 		if reply.GetVersion() != version {
 			syncConf(clients[idx], ctx)
