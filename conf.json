@@ -1,0 +1,166 @@
+{
+	"next": 0,
+	"level": 0,
+	"shard_confs": [
+		{
+			"shard_idx": 0,
+			"shard_node_name": "shard_node_0",
+			"shard_node_confs": {
+				"ip": "10.182.183.5",
+				"base_port": 50050,
+				"status": "working",
+				"max_key": 1000
+			}
+		},
+		{
+			"shard_idx": 1,
+			"shard_node_name": "shard_node_1",
+			"shard_node_confs": {
+				"ip": "10.182.183.6",
+				"base_port": 50051,
+				"status": "working",
+				"max_key": 1000
+			}
+		},
+		{
+			"shard_idx": 2,
+			"shard_node_name": "shard_node_2",
+			"shard_node_confs": {
+				"ip": "10.182.183.7",
+				"base_port": 50052,
+				"status": "working",
+				"max_key": 1000
+			}
+		},
+		{
+			"shard_idx": 3,
+			"shard_node_name": "shard_node_3",
+			"shard_node_confs": {
+				"ip": "10.182.183.8",
+				"base_port": 50053,
+				"status": "working",
+				"max_key": 1000
+			}
+		},
+		{
+			"shard_idx": 4,
+			"shard_node_name": "shard_node_4",
+			"shard_node_confs": {
+				"ip": "10.182.183.9",
+				"base_port": 50054,
+				"status": "sleep",
+				"max_key": 1000
+			}
+		},
+		{
+			"shard_idx": 5,
+			"shard_node_name": "shard_node_5",
+			"shard_node_confs": {
+				"ip": "10.182.183.10",
+				"base_port": 50055,
+				"status": "sleep",
+				"max_key": 1000
+			}
+		},
+		{
+			"shard_idx": 6,
+			"shard_node_name": "shard_node_6",
+			"shard_node_confs": {
+				"ip": "10.182.183.11",
+				"base_port": 50056,
+				"status": "sleep",
+				"max_key": 1000
+			}
+		},
+		{
+			"shard_idx": 7,
+			"shard_node_name": "shard_node_7",
+			"shard_node_confs": {
+				"ip": "10.182.183.12",
+				"base_port": 50057,
+				"status": "sleep",
+				"max_key": 1000
+			}
+		},
+		{
+			"shard_idx": 8,
+			"shard_node_name": "shard_node_8",
+			"shard_node_confs": {
+				"ip": "10.182.183.13",
+				"base_port": 50058,
+				"status": "sleep",
+				"max_key": 1000
+			}
+		},
+		{
+			"shard_idx": 9,
+			"shard_node_name": "shard_node_9",
+			"shard_node_confs": {
+				"ip": "10.182.183.14",
+				"base_port": 50059,
+				"status": "sleep",
+				"max_key": 1000
+			}
+		},
+		{
+			"shard_idx": 10,
+			"shard_node_name": "shard_node_10",
+			"shard_node_confs": {
+				"ip": "10.182.183.15",
+				"base_port": 50060,
+				"status": "sleep",
+				"max_key": 1000
+			}
+		},
+		{
+			"shard_idx": 11,
+			"shard_node_name": "shard_node_11",
+			"shard_node_confs": {
+				"ip": "10.182.183.16",
+				"base_port": 50061,
+				"status": "sleep",
+				"max_key": 1000
+			}
+		},
+		{
+			"shard_idx": 12,
+			"shard_node_name": "shard_node_11",
+			"shard_node_confs": {
+				"ip": "10.182.183.1",
+				"base_port": 50062,
+				"status": "sleep",
+				"max_key": 1000
+			}
+		},
+		{
+			"shard_idx": 13,
+			"shard_node_name": "shard_node_11",
+			"shard_node_confs": {
+				"ip": "10.182.183.2",
+				"base_port": 50063,
+				"status": "sleep",
+				"max_key": 1000
+			}
+		},
+		{
+			"shard_idx": 14,
+			"shard_node_name": "shard_node_11",
+			"shard_node_confs": {
+				"ip": "10.182.183.3",
+				"base_port": 50064,
+				"status": "sleep",
+				"max_key": 1000
+			}
+		},
+		{
+			"shard_idx": 15,
+			"shard_node_name": "shard_node_11",
+			"shard_node_confs": {
+				"ip": "10.182.183.4",
+				"base_port": 50065,
+				"status": "sleep",
+				"max_key": 1000
+			}
+		}
+	]
+}

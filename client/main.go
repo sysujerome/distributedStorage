@@ -293,6 +293,7 @@ func test() {
 	}
 	fmt.Println("set....")
 	// SET
+	start := time.Now()
 	preSecond := time.Now()
 	preIndex := 0
 	for i := 0; i < len(keys); i++ {
@@ -344,17 +345,17 @@ func test() {
 			preSecond = now
 		}
 	}
-	// elapse := time.Since(start)
-	// fmt.Printf("Set %d keys took %s\n", len(keys), elapse)
+	elapse := time.Since(start)
+	fmt.Printf("Set %d keys took %s\n", len(keys), elapse)
 
 	fmt.Println("get....")
 	// GET
+	start = time.Now()
 	preSecond = time.Now()
 	preIndex = 0
 	successNumber := 0
 	wrongNumber := 0
 	syncConf(clients[0], ctx)
-	// start = time.Now()
 	for i := 0; i < len(keys); i++ {
 		// if i%10 == 0 {
 		// 	fmt.Printf("%d epoch...\n", i)
@@ -380,8 +381,8 @@ func test() {
 			preSecond = now
 		}
 	}
-	// elapse = time.Since(start)
-	// fmt.Printf("Get %d keys took %s\n", len(keys), elapse)
+	elapse = time.Since(start)
+	fmt.Printf("Get %d keys took %s\n", len(keys), elapse)
 
 	fmt.Printf("Total number : %d\n", len(keys))
 	fmt.Printf("Success number : %d\n", successNumber)

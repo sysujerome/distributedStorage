@@ -1,4 +1,5 @@
 
+<<<<<<< HEAD
 2022/03/26 11:44:27 server listening at 192.168.1.128:50051
 2022/03/26 11:44:27 server listening at 192.168.1.128:50050
 2022/03/26 11:44:27 server listening at 192.168.1.128:50057
@@ -51,3 +52,21 @@ google.golang.org/grpc.(*Server).serveStreams.func1.2()
 	/home/jerome/go/pkg/mod/google.golang.org/grpc@v1.44.0/server.go:921 +0x98
 created by google.golang.org/grpc.(*Server).serveStreams.func1
 	/home/jerome/go/pkg/mod/google.golang.org/grpc@v1.44.0/server.go:919 +0x294
+=======
+2022/03/25 13:21:36 server listening at 192.168.1.128:50050
+2022/03/25 13:21:36 server listening at 192.168.1.128:50053
+2022/03/25 13:21:36 server listening at 192.168.1.128:50055
+2022/03/25 13:21:36 server listening at 192.168.1.128:50054
+2022/03/25 13:21:36 server listening at 192.168.1.128:50057
+2022/03/25 13:21:36 server listening at 192.168.1.128:50059
+2022/03/25 13:21:36 server listening at 192.168.1.128:50058
+2022/03/25 13:21:36 server listening at 192.168.1.128:50060
+2022/03/25 13:21:36 server listening at 192.168.1.128:50052
+2022/03/25 13:21:36 server listening at 192.168.1.128:50063
+2022/03/25 13:21:36 server listening at 192.168.1.128:50056
+2022/03/25 13:21:36 server listening at 192.168.1.128:50065
+2022/03/25 13:21:36 server listening at 192.168.1.128:50061
+2022/03/25 13:21:36 server listening at 192.168.1.128:50062
+2022/03/25 13:21:36 server listening at 192.168.1.128:50064
+2022/03/25 13:21:36 server listening at 192.168.1.128:50051
+>>>>>>> 3a20364e5adf6b887c7d8e23f5a623995a128026
