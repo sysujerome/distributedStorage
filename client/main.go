@@ -293,95 +293,97 @@ func test() {
 	}
 	fmt.Println("set....")
 	// SET
+	start := time.Now()
 	preSecond := time.Now()
 	preIndex := 0
-	for i := 0; i < len(keys); i++ {
-		key := keys[i]
-		value := values[i]
-		// addr := serverAddress[idx]
-		// conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
-		// check(err)d
-		// defer conn.Close()
-		// c := pb.NewStorageClient(conn)
+	// for i := 0; i < len(keys); i++ {
+	// 	key := keys[i]
+	// 	value := values[i]
+	// 	// addr := serverAddress[idx]
+	// 	// conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	// 	// check(err)d
+	// 	// defer conn.Close()
+	// 	// c := pb.NewStorageClient(conn)
 
-		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
-		defer cancel()
-		// 每次都要同步配置文件
-		// syncConf(clients[0], ctx)
-		idx := hashFunc(key)
-		reply, err := clients[idx].Set(ctx, &pb.SetRequest{Key: key, Value: value})
-		check(err)
-		if reply.GetVersion() != version {
-			syncConf(clients[idx], ctx)
-		}
-		if err != nil || reply.GetStatus() == statusCode.Failed {
-			fmt.Printf("%s status: %s\n", serversAddress[idx], reply.GetStatus())
-			panic(reply.GetErr())
-		}
+	// 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
+	// 	defer cancel()
+	// 	// 每次都要同步配置文件
+	// 	// syncConf(clients[0], ctx)
+	// 	idx := hashFunc(key)
+	// 	reply, err := clients[idx].Set(ctx, &pb.SetRequest{Key: key, Value: value})
+	// 	check(err)
+	// 	if reply.GetVersion() != version {
+	// 		syncConf(clients[idx], ctx)
+	// 	}
+	// 	if err != nil || reply.GetStatus() == statusCode.Failed {
+	// 		fmt.Printf("%s status: %s\n", serversAddress[idx], reply.GetStatus())
+	// 		panic(reply.GetErr())
+	// 	}
 
-		// 如果出现moved状态码，说明集群状态已经改变，需要同步配置文件
-		if reply.GetStatus() == statusCode.Moved {
-			target := reply.GetTarget()
-			syncConf(clients[target], ctx)
-			reply1, err := clients[target].Set(ctx, &pb.SetRequest{Key: key, Value: value})
-			check(err)
-			if err != nil || reply1.GetStatus() == statusCode.Failed {
-				fmt.Printf("%s status: %s\n", serversAddress[target], reply1.GetStatus())
-				panic(reply1.GetErr())
-			}
-		}
-		if reply.GetVersion() != version {
-			syncConf(clients[idx], ctx)
-		}
-		// fmt.Println(reply.GetStatus())
+	// 	// 如果出现moved状态码，说明集群状态已经改变，需要同步配置文件
+	// 	if reply.GetStatus() == statusCode.Moved {
+	// 		target := reply.GetTarget()
+	// 		syncConf(clients[target], ctx)
+	// 		reply1, err := clients[target].Set(ctx, &pb.SetRequest{Key: key, Value: value})
+	// 		check(err)
+	// 		if err != nil || reply1.GetStatus() == statusCode.Failed {
+	// 			fmt.Printf("%s status: %s\n", serversAddress[target], reply1.GetStatus())
+	// 			panic(reply1.GetErr())
+	// 		}
+	// 	}
+	// 	if reply.GetVersion() != version {
+	// 		syncConf(clients[idx], ctx)
+	// 	}
+	// 	// fmt.Println(reply.GetStatus())
 
-		// 按间隔输出qps
-		nextSecond := preSecond.Add(1 * time.Second)
-		now := time.Now()
-		if now.After(nextSecond) {
-			fmt.Printf("%d echo... per second\n", i-preIndex)
-			preIndex = i
-			preSecond = now
-		}
-	}
-	// elapse := time.Since(start)
-	// fmt.Printf("Set %d keys took %s\n", len(keys), elapse)
+	// 	// 按间隔输出qps
+	// 	nextSecond := preSecond.Add(1 * time.Second)
+	// 	now := time.Now()
+	// 	if now.After(nextSecond) {
+	// 		fmt.Printf("%d echo... per second\n", i-preIndex)
+	// 		preIndex = i
+	// 		preSecond = now
+	// 	}
+	// }
+	elapse := time.Since(start)
+	fmt.Printf("Set %d keys took %s\n", len(keys), elapse)
 
 	fmt.Println("get....")
 	// GET
+	start = time.Now()
 	preSecond = time.Now()
 	preIndex = 0
 	successNumber := 0
 	wrongNumber := 0
 	syncConf(clients[0], ctx)
 	// start = time.Now()
-	for i := 0; i < len(keys); i++ {
-		// if i%10 == 0 {
-		// 	fmt.Printf("%d epoch...\n", i)
-		// }
-		key := keys[i]
-		// value := values[i]
-		idx := hashFunc(key)
-		// found := false
+	// for i := 0; i < len(keys); i++ {
+	// 	// if i%10 == 0 {
+	// 	// 	fmt.Printf("%d epoch...\n", i)
+	// 	// }
+	// 	key := keys[i]
+	// 	// value := values[i]
+	// 	idx := hashFunc(key)
+	// 	// found := false
 
-		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
-		defer cancel()
-		reply, _ := clients[idx].Get(ctx, &pb.GetRequest{Key: key})
-		// if reply.GetStatus() == statusCode.Ok && reply.GetResult() == values[i] {
-		if reply.GetStatus() == statusCode.Ok {
-			successNumber++
-		}
-		// 按间隔输出qps
-		nextSecond := preSecond.Add(1 * time.Second)
-		now := time.Now()
-		if now.After(nextSecond) {
-			fmt.Printf("%d echo... per second\n", i-preIndex)
-			preIndex = i
-			preSecond = now
-		}
-	}
-	// elapse = time.Since(start)
-	// fmt.Printf("Get %d keys took %s\n", len(keys), elapse)
+	// 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
+	// 	defer cancel()
+	// 	reply, _ := clients[idx].Get(ctx, &pb.GetRequest{Key: key})
+	// 	// if reply.GetStatus() == statusCode.Ok && reply.GetResult() == values[i] {
+	// 	if reply.GetStatus() == statusCode.Ok {
+	// 		successNumber++
+	// 	}
+	// 	// 按间隔输出qps
+	// 	nextSecond := preSecond.Add(1 * time.Second)
+	// 	now := time.Now()
+	// 	if now.After(nextSecond) {
+	// 		fmt.Printf("%d echo... per second\n", i-preIndex)
+	// 		preIndex = i
+	// 		preSecond = now
+	// 	}
+	// }
+	elapse = time.Since(start)
+	fmt.Printf("Get %d keys took %s\n", len(keys), elapse)
 
 	fmt.Printf("Total number : %d\n", len(keys))
 	fmt.Printf("Success number : %d\n", successNumber)
@@ -393,6 +395,9 @@ func test() {
 	return
 
 	// DEL
+	start = time.Now()
+	preSecond = time.Now()
+	// fmt.Println("")
 	fmt.Println("del....")
 	for i := 0; i < len(keys); i++ {
 		key := keys[i]
@@ -406,13 +411,26 @@ func test() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
 		defer cancel()
 		reply, err := c.Del(ctx, &pb.DelRequest{Key: key})
-		if err != nil || reply.GetStatus() != statusCode.Ok {
+		if err != nil {
+			panic(err)
+		}
+		if reply.GetStatus() != statusCode.Ok {
 			panic(reply.GetErr())
 		}
 		if reply.GetResult() != 1 {
 			log.Fatalf("Delete key %s failed!", key)
 		}
+		// 按间隔输出qps
+		nextSecond := preSecond.Add(1 * time.Second)
+		now := time.Now()
+		if now.After(nextSecond) {
+			fmt.Printf("%d echo... per second\n", i-preIndex)
+			preIndex = i
+			preSecond = now
+		}
 	}
+	elapse = time.Since(start)
+	fmt.Printf("Del %d keys took %s\n", len(keys), elapse)
 
 	// GET
 	fmt.Println("get....")

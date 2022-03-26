@@ -175,7 +175,7 @@ func split() {
 	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	check(err)
 	defer conn.Close()
-	c := pb.NewStorageClient(conn
+	c := pb.NewStorageClient(conn)
 	// Contact the server and print out its response.
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(2*time.Minute))
 	defer cancel()
@@ -210,6 +210,7 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 		check(err)
 		defer conn.Close()
 		c := pb.NewStorageClient(conn)
+
 		// Contact the server and print out its response.
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(10*time.Second))
 		defer cancel()
@@ -300,7 +301,7 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 					check(err)
 					defer conn.Close()
 					c := pb.NewStorageClient(conn)
-		
+
 					reply, err := c.Set(ctx, &pb.SetRequest{Key: operation[1], Value: operation[2]})
 					if err != nil {
 						panic(err)
@@ -321,7 +322,7 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 					check(err)
 					defer conn.Close()
 					c := pb.NewStorageClient(conn)
-		
+
 					c.Del(ctx, &pb.DelRequest{Key: operation[1]})
 				}
 			}
@@ -381,7 +382,7 @@ func syncConf() {
 	serv := serversAddress[target]
 	conn, err := grpc.Dial(serv, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	check(err)
-	c := pb.NewStorageClient(conn
+	c := pb.NewStorageClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(2*time.Second))
 	defer cancel()
 	reply, err := c.SyncConf(ctx, &request)
@@ -420,6 +421,7 @@ func (s *server) SyncConf(ctx context.Context, in *pb.SyncConfRequest) (*pb.Sync
 		conn, err := grpc.Dial(serv, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		check(err)
 		c := pb.NewStorageClient(conn)
+
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(2*time.Second))
 		defer cancel()
 		reply, err := c.SyncConf(ctx, in)

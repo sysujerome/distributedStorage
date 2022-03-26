@@ -1,5 +1,6 @@
 ./deploy/shutdown.sh 
 #go build -o ./bin/server ./server/storeInside.go
+rm -rf ./overflow
 echo > log
 for idx in $(seq 0 15)
 do
