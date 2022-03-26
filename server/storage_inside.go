@@ -82,8 +82,9 @@ func (s *server) Get(ctx context.Context, in *pb.GetRequest) (*pb.GetReply, erro
 			check(err)
 			defer conn.Close()
 			c := pb.NewStorageClient(conn)
+
 			// Contact the server and print out its response.
-			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
+			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(2*time.Second))
 			defer cancel()
 
 			reply, err := c.Get(ctx, &pb.GetRequest{Key: in.GetKey()})
@@ -174,9 +175,9 @@ func split() {
 	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	check(err)
 	defer conn.Close()
-	c := pb.NewStorageClient(conn)
+	c := pb.NewStorageClient(conn
 	// Contact the server and print out its response.
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Minute))
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(2*time.Minute))
 	defer cancel()
 
 	reply, err := c.Split(ctx, &pb.SplitRequest{})
@@ -210,7 +211,7 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 		defer conn.Close()
 		c := pb.NewStorageClient(conn)
 		// Contact the server and print out its response.
-		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(10*time.Second))
 		defer cancel()
 
 		reply, err := c.WakeUp(ctx, &pb.WakeRequest{})
@@ -299,8 +300,12 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 					check(err)
 					defer conn.Close()
 					c := pb.NewStorageClient(conn)
+		
 					reply, err := c.Set(ctx, &pb.SetRequest{Key: operation[1], Value: operation[2]})
-					if err != nil || reply.GetStatus() != statusCode.Ok {
+					if err != nil {
+						panic(err)
+					}
+					if reply.GetStatus() != statusCode.Ok {
 						panic(reply.GetStatus())
 					}
 				}
@@ -316,6 +321,7 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 					check(err)
 					defer conn.Close()
 					c := pb.NewStorageClient(conn)
+		
 					c.Del(ctx, &pb.DelRequest{Key: operation[1]})
 				}
 			}
@@ -375,8 +381,8 @@ func syncConf() {
 	serv := serversAddress[target]
 	conn, err := grpc.Dial(serv, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	check(err)
-	c := pb.NewStorageClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
+	c := pb.NewStorageClient(conn
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(2*time.Second))
 	defer cancel()
 	reply, err := c.SyncConf(ctx, &request)
 	check(err)
@@ -414,7 +420,7 @@ func (s *server) SyncConf(ctx context.Context, in *pb.SyncConfRequest) (*pb.Sync
 		conn, err := grpc.Dial(serv, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		check(err)
 		c := pb.NewStorageClient(conn)
-		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(2*time.Second))
 		defer cancel()
 		reply, err := c.SyncConf(ctx, in)
 		check(err)
