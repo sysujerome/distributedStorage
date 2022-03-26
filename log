@@ -1,17 +1,53 @@
 
-2022/03/25 13:21:36 server listening at 192.168.1.128:50050
-2022/03/25 13:21:36 server listening at 192.168.1.128:50053
-2022/03/25 13:21:36 server listening at 192.168.1.128:50055
-2022/03/25 13:21:36 server listening at 192.168.1.128:50054
-2022/03/25 13:21:36 server listening at 192.168.1.128:50057
-2022/03/25 13:21:36 server listening at 192.168.1.128:50059
-2022/03/25 13:21:36 server listening at 192.168.1.128:50058
-2022/03/25 13:21:36 server listening at 192.168.1.128:50060
-2022/03/25 13:21:36 server listening at 192.168.1.128:50052
-2022/03/25 13:21:36 server listening at 192.168.1.128:50063
-2022/03/25 13:21:36 server listening at 192.168.1.128:50056
-2022/03/25 13:21:36 server listening at 192.168.1.128:50065
-2022/03/25 13:21:36 server listening at 192.168.1.128:50061
-2022/03/25 13:21:36 server listening at 192.168.1.128:50062
-2022/03/25 13:21:36 server listening at 192.168.1.128:50064
-2022/03/25 13:21:36 server listening at 192.168.1.128:50051
+2022/03/26 11:44:27 server listening at 192.168.1.128:50051
+2022/03/26 11:44:27 server listening at 192.168.1.128:50050
+2022/03/26 11:44:27 server listening at 192.168.1.128:50057
+2022/03/26 11:44:27 server listening at 192.168.1.128:50055
+2022/03/26 11:44:27 server listening at 192.168.1.128:50054
+2022/03/26 11:44:27 server listening at 192.168.1.128:50058
+2022/03/26 11:44:27 server listening at 192.168.1.128:50056
+2022/03/26 11:44:27 server listening at 192.168.1.128:50060
+2022/03/26 11:44:27 server listening at 192.168.1.128:50053
+2022/03/26 11:44:27 server listening at 192.168.1.128:50063
+2022/03/26 11:44:27 server listening at 192.168.1.128:50059
+2022/03/26 11:44:27 server listening at 192.168.1.128:50062
+2022/03/26 11:44:27 server listening at 192.168.1.128:50064
+2022/03/26 11:44:27 server listening at 192.168.1.128:50065
+2022/03/26 11:44:27 server listening at 192.168.1.128:50061
+2022/03/26 11:44:27 server listening at 192.168.1.128:50052
+panic: rpc error: code = Unavailable desc = connection error: desc = "transport: Error while dialing dial tcp 192.168.1.128:50058: socket: too many open files"
+
+goroutine 40342 [running]:
+main.(*server).Split.func1()
+	/home/jerome/lab/distributedStorage/server/storage_inside.go:304 +0x1033
+main.(*server).Split(0x8679a0, {0xc0008c6c90, 0x48ac06}, 0x960870)
+	/home/jerome/lab/distributedStorage/server/storage_inside.go:334 +0x97
+storage/kvstore._Storage_Split_Handler({0x885740, 0xcbc7f0}, {0x95bf80, 0xc0008c6c60}, 0xc0008f80c0, 0x0)
+	/home/jerome/lab/distributedStorage/proto/kvstore_grpc.pb.go:227 +0x170
+google.golang.org/grpc.(*Server).processUnaryRPC(0xc00014b180, {0x963df8, 0xc000a97040}, 0xc000e16120, 0xc000198fc0, 0xc80a08, 0x0)
+	/home/jerome/go/pkg/mod/google.golang.org/grpc@v1.44.0/server.go:1282 +0xccf
+google.golang.org/grpc.(*Server).handleStream(0xc00014b180, {0x963df8, 0xc000a97040}, 0xc000e16120, 0x0)
+	/home/jerome/go/pkg/mod/google.golang.org/grpc@v1.44.0/server.go:1616 +0xa2a
+google.golang.org/grpc.(*Server).serveStreams.func1.2()
+	/home/jerome/go/pkg/mod/google.golang.org/grpc@v1.44.0/server.go:921 +0x98
+created by google.golang.org/grpc.(*Server).serveStreams.func1
+	/home/jerome/go/pkg/mod/google.golang.org/grpc@v1.44.0/server.go:919 +0x294
+panic: rpc error: code = Unavailable desc = error reading from server: EOF
+
+goroutine 20247 [running]:
+main.check(...)
+	/home/jerome/lab/distributedStorage/server/storage_inside.go:467
+main.split()
+	/home/jerome/lab/distributedStorage/server/storage_inside.go:183 +0x23e
+main.(*server).Set(0x87acc0, {0xc000b214a0, 0x48ac06}, 0xc000b214a0)
+	/home/jerome/lab/distributedStorage/server/storage_inside.go:138 +0x459
+storage/kvstore._Storage_Set_Handler({0x885740, 0xcbc7f0}, {0x95bf80, 0xc000b246c0}, 0xc000b0db00, 0x0)
+	/home/jerome/lab/distributedStorage/proto/kvstore_grpc.pb.go:173 +0x170
+google.golang.org/grpc.(*Server).processUnaryRPC(0xc00014b180, {0x963df8, 0xc000113860}, 0xc000b14ea0, 0xc00019afc0, 0xc809c0, 0x0)
+	/home/jerome/go/pkg/mod/google.golang.org/grpc@v1.44.0/server.go:1282 +0xccf
+google.golang.org/grpc.(*Server).handleStream(0xc00014b180, {0x963df8, 0xc000113860}, 0xc000b14ea0, 0x0)
+	/home/jerome/go/pkg/mod/google.golang.org/grpc@v1.44.0/server.go:1616 +0xa2a
+google.golang.org/grpc.(*Server).serveStreams.func1.2()
+	/home/jerome/go/pkg/mod/google.golang.org/grpc@v1.44.0/server.go:921 +0x98
+created by google.golang.org/grpc.(*Server).serveStreams.func1
+	/home/jerome/go/pkg/mod/google.golang.org/grpc@v1.44.0/server.go:919 +0x294

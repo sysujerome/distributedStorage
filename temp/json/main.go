@@ -56,7 +56,7 @@ func main() {
 		shardConf := new(ShardNodeConf)
 		shardConf.IP = "192.168.1.128"
 		shardConf.BasePort = 50050 + i
-		shardConf.MaxKey = 1000
+		shardConf.MaxKey = 20000
 		// Working  string
 		// Sleep    string
 		// Spliting string

@@ -293,11 +293,9 @@ func test() {
 	}
 	fmt.Println("set....")
 	// SET
-	start := time.Now()
+	preSecond := time.Now()
+	preIndex := 0
 	for i := 0; i < len(keys); i++ {
-		if i%5 == 0 {
-			// fmt.Printf("%d epoch...\n", i)
-		}
 		key := keys[i]
 		value := values[i]
 		// addr := serverAddress[idx]
@@ -324,28 +322,39 @@ func test() {
 		// 如果出现moved状态码，说明集群状态已经改变，需要同步配置文件
 		if reply.GetStatus() == statusCode.Moved {
 			target := reply.GetTarget()
+			syncConf(clients[target], ctx)
 			reply1, err := clients[target].Set(ctx, &pb.SetRequest{Key: key, Value: value})
 			check(err)
 			if err != nil || reply1.GetStatus() == statusCode.Failed {
 				fmt.Printf("%s status: %s\n", serversAddress[target], reply1.GetStatus())
 				panic(reply1.GetErr())
 			}
-			syncConf(clients[target], ctx)
 		}
 		if reply.GetVersion() != version {
 			syncConf(clients[idx], ctx)
 		}
 		// fmt.Println(reply.GetStatus())
+
+		// 按间隔输出qps
+		nextSecond := preSecond.Add(1 * time.Second)
+		now := time.Now()
+		if now.After(nextSecond) {
+			fmt.Printf("%d echo... per second\n", i-preIndex)
+			preIndex = i
+			preSecond = now
+		}
 	}
-	elapse := time.Since(start)
-	fmt.Printf("Set %d keys took %s\n", len(keys), elapse)
+	// elapse := time.Since(start)
+	// fmt.Printf("Set %d keys took %s\n", len(keys), elapse)
 
 	fmt.Println("get....")
 	// GET
+	preSecond = time.Now()
+	preIndex = 0
 	successNumber := 0
 	wrongNumber := 0
 	syncConf(clients[0], ctx)
-	start = time.Now()
+	// start = time.Now()
 	for i := 0; i < len(keys); i++ {
 		// if i%10 == 0 {
 		// 	fmt.Printf("%d epoch...\n", i)
@@ -362,9 +371,17 @@ func test() {
 		if reply.GetStatus() == statusCode.Ok {
 			successNumber++
 		}
+		// 按间隔输出qps
+		nextSecond := preSecond.Add(1 * time.Second)
+		now := time.Now()
+		if now.After(nextSecond) {
+			fmt.Printf("%d echo... per second\n", i-preIndex)
+			preIndex = i
+			preSecond = now
+		}
 	}
-	elapse = time.Since(start)
-	fmt.Printf("Get %d keys took %s\n", len(keys), elapse)
+	// elapse = time.Since(start)
+	// fmt.Printf("Get %d keys took %s\n", len(keys), elapse)
 
 	fmt.Printf("Total number : %d\n", len(keys))
 	fmt.Printf("Success number : %d\n", successNumber)
