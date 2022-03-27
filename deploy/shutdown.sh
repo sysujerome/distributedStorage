@@ -1,1 +1,1 @@
-ps -ef | grep ./bin/server | grep -v grep | awk '{print $2}' | xargs kill -9  &> log
+ps -ef | grep ./bin/stor | grep -v grep | awk '{print $2}' | xargs kill -9  &> log
