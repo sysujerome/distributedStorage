@@ -1,0 +1,1 @@
+./bin/client -ip=10.182.183.1 -port=50050 -conf=./conf.json

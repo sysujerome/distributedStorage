@@ -83,7 +83,7 @@ func (s *server) Get(ctx context.Context, in *pb.GetRequest) (*pb.GetReply, erro
 			defer conn.Close()
 			c := pb.NewStorageClient(conn)
 			// Contact the server and print out its response.
-			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
+			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(2*time.Second))
 			defer cancel()
 
 			reply, err := c.Get(ctx, &pb.GetRequest{Key: in.GetKey()})
@@ -176,7 +176,7 @@ func split() {
 	defer conn.Close()
 	c := pb.NewStorageClient(conn)
 	// Contact the server and print out its response.
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Minute))
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
 	defer cancel()
 
 	reply, err := c.Split(ctx, &pb.SplitRequest{})
@@ -188,6 +188,20 @@ func split() {
 
 func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply, error) {
 	// log.Printf("Received get key: %v", in.GetKey())
+
+	// 分裂时一直新建连接会出现too many open files错误
+	var conns []*grpc.ClientConn
+	var clients []pb.StorageClient
+	for idx := 0; idx < len(serversAddress); idx++ {
+		addr := serversAddress[int64(idx)]
+		conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		check(err)
+		conns = append(conns, conn)
+		c := pb.NewStorageClient(conn)
+		clients = append(clients, c)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
+	defer cancel()
 
 	splitInside := func() { // 内部元素分裂
 		// fmt.Printf("%s : 节点分裂中....\n", serversAddress[*shardIdx])
@@ -204,16 +218,15 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 			*level++
 		}
 		syncConf()
-		target := serversAddress[secondIdx]
-		conn, err := grpc.Dial(target, grpc.WithTransportCredentials(insecure.NewCredentials()))
-		check(err)
-		defer conn.Close()
-		c := pb.NewStorageClient(conn)
+		// target := serversAddress[secondIdx]
+		// conn, err := grpc.Dial(target, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		// check(err)
+		// defer conn.Close()
+		// c := pb.NewStorageClient(conn)
 		// Contact the server and print out its response.
-		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
-		defer cancel()
+		
 
-		reply, err := c.WakeUp(ctx, &pb.WakeRequest{})
+		reply, err := clients[secondIdx].WakeUp(ctx, &pb.WakeRequest{})
 		check(err)
 		if reply.GetStatus() != statusCode.Ok {
 			// fmt.Printf("%s %s : 节点唤醒失败....\n", serversAddress[*shardIdx], serversAddress[secondIdx])
@@ -221,11 +234,11 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 		}
 		syncConf()
 
-		thisAddress := serversAddress[*shardIdx]
-		thisConn, err := grpc.Dial(thisAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
-		check(err)
-		defer thisConn.Close()
-		thisClient := pb.NewStorageClient(thisConn)
+		// thisAddress := serversAddress[]
+		// thisConn, err := grpc.Dial(thisAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		// check(err)
+		// defer thisConn.Close()
+		// thisClient := pb.NewStorageClient(thisConn)
 		// Contact the server and print out its response.
 
 		// fmt.Printf("%s : 开始分裂....\n", serversAddress[secondIdx])
@@ -233,54 +246,37 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 		for key, value := range db {
 			delete(db, key)
 			if hashFunc(key) == secondIdx {
-				reply1, err := c.Set(ctx, &pb.SetRequest{Key: key, Value: value})
+				reply1, err := clients[secondIdx].Set(ctx, &pb.SetRequest{Key: key, Value: value})
 				check(err)
-				if reply1.GetStatus() != statusCode.Ok {
-					fmt.Println(reply1.GetStatus())
-					fmt.Println("出错。。。")
-					panic(reply1.GetErr())
+				if reply1.GetStatus() != statusCode.Ok  && reply1.GetStatus() != statusCode.Stored {
+					for reply1.GetStatus() == statusCode.Moved {
+						reply1, err = clients[int(reply1.GetTarget())].Set(ctx, &pb.SetRequest{Key: key, Value: value})
+						check(err)
+					}
+					if reply1.GetStatus() != statusCode.Ok && reply1.GetStatus() != statusCode.Stored {
+						fmt.Println(reply1.GetStatus())
+						fmt.Println("出错。。。")
+						panic(reply1.GetErr())
+					}
 				}
 				count++
 			} else {
-				reply2, err := thisClient.Set(ctx, &pb.SetRequest{Key: key, Value: value})
+				reply2, err := clients[*shardIdx].Set(ctx, &pb.SetRequest{Key: key, Value: value})
 				check(err)
 				if reply2.GetStatus() != statusCode.Ok && reply2.GetStatus() != statusCode.Stored {
-
-					fmt.Println(reply2.GetStatus())
-					fmt.Println("出错。。。")
-					panic(reply2.GetErr())
-
+					for reply2.GetStatus() == statusCode.Moved {
+						reply2, err = clients[int(reply2.GetTarget())].Set(ctx, &pb.SetRequest{Key: key, Value: value})
+						check(err)
+					}
+					if reply2.GetStatus() != statusCode.Ok && reply2.GetStatus() != statusCode.Stored {
+						fmt.Println(reply2.GetStatus())
+						fmt.Println("出错。。。")
+						panic(reply2.GetErr())
+					}
 				}
 			}
 		}
-		// 遍历溢出表的内容
-		// iter := overflowDB.NewIterator(nil, nil)
-		// for iter.Next() {
-		// 	key := string(iter.Key())
-		// 	value := string(iter.Value())
-		// 	curIDX := hashFunc(string(key))
-		// 	err := overflowDB.Delete([]byte(key), nil)
-		// 	check(err)
-
-		// 	if curIDX == secondIdx {
-		// 		reply1, err := c.Set(ctx, &pb.SetRequest{Key: key, Value: value})
-		// 		check(err)
-		// 		if reply1.GetStatus() != statusCode.Ok {
-		// 			fmt.Println(reply1.GetStatus())
-		// 			fmt.Println("出错。。。")
-		// 			panic(reply1.GetErr())
-		// 		}
-		// 		count++
-		// 	} else {
-		// 		reply2, err := thisClient.Set(ctx, &pb.SetRequest{Key: key, Value: value})
-		// 		check(err)
-		// 		if reply2.GetStatus() != statusCode.Ok {
-		// 			fmt.Println(reply2.GetStatus())
-		// 			fmt.Println("出错。。。")
-		// 			panic(reply2.GetErr())
-		// 		}
-		// 	}
-		// }
+		
 
 		serversStatus[*shardIdx] = serverStatus.Working
 		syncConf()
@@ -294,13 +290,11 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 				if idx == *shardIdx {
 					db[operation[1]] = db[operation[2]]
 				} else {
-					target := serversAddress[idx]
-					conn, err := grpc.Dial(target, grpc.WithTransportCredentials(insecure.NewCredentials()))
-					check(err)
-					defer conn.Close()
-					c := pb.NewStorageClient(conn)
-					reply, err := c.Set(ctx, &pb.SetRequest{Key: operation[1], Value: operation[2]})
-					if err != nil || reply.GetStatus() != statusCode.Ok {
+					reply, err := clients[idx].Set(ctx, &pb.SetRequest{Key: operation[1], Value: operation[2]})
+					if err != nil {
+						panic(err)
+					}
+					if reply.GetStatus() != statusCode.Ok {
 						panic(reply.GetStatus())
 					}
 				}
@@ -311,12 +305,7 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 				if idx == *shardIdx {
 					db[operation[1]] = db[operation[2]]
 				} else {
-					target := serversAddress[idx]
-					conn, err := grpc.Dial(target, grpc.WithTransportCredentials(insecure.NewCredentials()))
-					check(err)
-					defer conn.Close()
-					c := pb.NewStorageClient(conn)
-					c.Del(ctx, &pb.DelRequest{Key: operation[1]})
+					clients[idx].Del(ctx, &pb.DelRequest{Key: operation[1]})
 				}
 			}
 		}
@@ -376,7 +365,7 @@ func syncConf() {
 	conn, err := grpc.Dial(serv, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	check(err)
 	c := pb.NewStorageClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(2*time.Second))
 	defer cancel()
 	reply, err := c.SyncConf(ctx, &request)
 	check(err)
@@ -414,7 +403,7 @@ func (s *server) SyncConf(ctx context.Context, in *pb.SyncConfRequest) (*pb.Sync
 		conn, err := grpc.Dial(serv, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		check(err)
 		c := pb.NewStorageClient(conn)
-		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(2*time.Second))
 		defer cancel()
 		reply, err := c.SyncConf(ctx, in)
 		check(err)
