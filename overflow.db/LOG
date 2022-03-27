@@ -592,3 +592,71 @@
 11:44:27.911817 db@open done T·86.10916ms
 =======
 >>>>>>> 3a20364e5adf6b887c7d8e23f5a623995a128026
+=============== Mar 27, 2022 (CST) ===============
+13:07:07.388604 log@legend F·NumFile S·FileSize N·Entry C·BadEntry B·BadBlock Ke·KeyError D·DroppedEntry L·Level Q·SeqNum T·TimeElapsed
+13:07:07.388778 CURRENT: corrupted content: "<<<<<<< HEAD\nMANIFEST-000131\n=======\nMANIFEST-000119\n>>>>>>> 3a20364e5adf6b887c7d8e23f5a623995a128026\n"
+13:07:07.388821 CURRENT.bak: corrupted content: "<<<<<<< HEAD\nMANIFEST-000129\n=======\nMANIFEST-000117\n>>>>>>> 3a20364e5adf6b887c7d8e23f5a623995a128026\n"
+=============== Mar 27, 2022 (CST) ===============
+13:07:07.390818 log@legend F·NumFile S·FileSize N·Entry C·BadEntry B·BadBlock Ke·KeyError D·DroppedEntry L·Level Q·SeqNum T·TimeElapsed
+13:07:07.390968 CURRENT: corrupted content: "<<<<<<< HEAD\nMANIFEST-000131\n=======\nMANIFEST-000119\n>>>>>>> 3a20364e5adf6b887c7d8e23f5a623995a128026\n"
+13:07:07.391301 CURRENT.bak: corrupted content: "<<<<<<< HEAD\nMANIFEST-000129\n=======\nMANIFEST-000117\n>>>>>>> 3a20364e5adf6b887c7d8e23f5a623995a128026\n"
+=============== Mar 27, 2022 (CST) ===============
+13:07:07.392100 log@legend F·NumFile S·FileSize N·Entry C·BadEntry B·BadBlock Ke·KeyError D·DroppedEntry L·Level Q·SeqNum T·TimeElapsed
+13:07:07.392236 CURRENT: corrupted content: "<<<<<<< HEAD\nMANIFEST-000131\n=======\nMANIFEST-000119\n>>>>>>> 3a20364e5adf6b887c7d8e23f5a623995a128026\n"
+13:07:07.392270 CURRENT.bak: corrupted content: "<<<<<<< HEAD\nMANIFEST-000129\n=======\nMANIFEST-000117\n>>>>>>> 3a20364e5adf6b887c7d8e23f5a623995a128026\n"
+=============== Mar 27, 2022 (CST) ===============
+13:07:07.395081 log@legend F·NumFile S·FileSize N·Entry C·BadEntry B·BadBlock Ke·KeyError D·DroppedEntry L·Level Q·SeqNum T·TimeElapsed
+13:07:07.398107 CURRENT: corrupted content: "<<<<<<< HEAD\nMANIFEST-000131\n=======\nMANIFEST-000119\n>>>>>>> 3a20364e5adf6b887c7d8e23f5a623995a128026\n"
+13:07:07.398283 CURRENT.bak: corrupted content: "<<<<<<< HEAD\nMANIFEST-000129\n=======\nMANIFEST-000117\n>>>>>>> 3a20364e5adf6b887c7d8e23f5a623995a128026\n"
+=============== Mar 27, 2022 (CST) ===============
+13:07:07.401470 log@legend F·NumFile S·FileSize N·Entry C·BadEntry B·BadBlock Ke·KeyError D·DroppedEntry L·Level Q·SeqNum T·TimeElapsed
+13:07:07.401578 CURRENT: corrupted content: "<<<<<<< HEAD\nMANIFEST-000131\n=======\nMANIFEST-000119\n>>>>>>> 3a20364e5adf6b887c7d8e23f5a623995a128026\n"
+13:07:07.401605 CURRENT.bak: corrupted content: "<<<<<<< HEAD\nMANIFEST-000129\n=======\nMANIFEST-000117\n>>>>>>> 3a20364e5adf6b887c7d8e23f5a623995a128026\n"
+=============== Mar 27, 2022 (CST) ===============
+13:07:07.405334 log@legend F·NumFile S·FileSize N·Entry C·BadEntry B·BadBlock Ke·KeyError D·DroppedEntry L·Level Q·SeqNum T·TimeElapsed
+13:07:07.405492 CURRENT: corrupted content: "<<<<<<< HEAD\nMANIFEST-000131\n=======\nMANIFEST-000119\n>>>>>>> 3a20364e5adf6b887c7d8e23f5a623995a128026\n"
+13:07:07.405570 CURRENT.bak: corrupted content: "<<<<<<< HEAD\nMANIFEST-000129\n=======\nMANIFEST-000117\n>>>>>>> 3a20364e5adf6b887c7d8e23f5a623995a128026\n"
+=============== Mar 27, 2022 (CST) ===============
+13:07:07.405921 log@legend F·NumFile S·FileSize N·Entry C·BadEntry B·BadBlock Ke·KeyError D·DroppedEntry L·Level Q·SeqNum T·TimeElapsed
+13:07:07.406038 CURRENT: corrupted content: "<<<<<<< HEAD\nMANIFEST-000131\n=======\nMANIFEST-000119\n>>>>>>> 3a20364e5adf6b887c7d8e23f5a623995a128026\n"
+13:07:07.406136 CURRENT.bak: corrupted content: "<<<<<<< HEAD\nMANIFEST-000129\n=======\nMANIFEST-000117\n>>>>>>> 3a20364e5adf6b887c7d8e23f5a623995a128026\n"
+=============== Mar 27, 2022 (CST) ===============
+13:07:07.407140 log@legend F·NumFile S·FileSize N·Entry C·BadEntry B·BadBlock Ke·KeyError D·DroppedEntry L·Level Q·SeqNum T·TimeElapsed
+13:07:07.407312 CURRENT: corrupted content: "<<<<<<< HEAD\nMANIFEST-000131\n=======\nMANIFEST-000119\n>>>>>>> 3a20364e5adf6b887c7d8e23f5a623995a128026\n"
+13:07:07.407361 CURRENT.bak: corrupted content: "<<<<<<< HEAD\nMANIFEST-000129\n=======\nMANIFEST-000117\n>>>>>>> 3a20364e5adf6b887c7d8e23f5a623995a128026\n"
+=============== Mar 27, 2022 (CST) ===============
+13:10:08.510649 log@legend F·NumFile S·FileSize N·Entry C·BadEntry B·BadBlock Ke·KeyError D·DroppedEntry L·Level Q·SeqNum T·TimeElapsed
+13:10:08.510953 CURRENT: corrupted content: "<<<<<<< HEAD\nMANIFEST-000131\n=======\nMANIFEST-000119\n>>>>>>> 3a20364e5adf6b887c7d8e23f5a623995a128026\n"
+13:10:08.511039 CURRENT.bak: corrupted content: "<<<<<<< HEAD\nMANIFEST-000129\n=======\nMANIFEST-000117\n>>>>>>> 3a20364e5adf6b887c7d8e23f5a623995a128026\n"
+=============== Mar 27, 2022 (CST) ===============
+13:10:08.512985 log@legend F·NumFile S·FileSize N·Entry C·BadEntry B·BadBlock Ke·KeyError D·DroppedEntry L·Level Q·SeqNum T·TimeElapsed
+13:10:08.513250 CURRENT: corrupted content: "<<<<<<< HEAD\nMANIFEST-000131\n=======\nMANIFEST-000119\n>>>>>>> 3a20364e5adf6b887c7d8e23f5a623995a128026\n"
+13:10:08.513327 CURRENT.bak: corrupted content: "<<<<<<< HEAD\nMANIFEST-000129\n=======\nMANIFEST-000117\n>>>>>>> 3a20364e5adf6b887c7d8e23f5a623995a128026\n"
+=============== Mar 27, 2022 (CST) ===============
+13:10:08.514697 log@legend F·NumFile S·FileSize N·Entry C·BadEntry B·BadBlock Ke·KeyError D·DroppedEntry L·Level Q·SeqNum T·TimeElapsed
+13:10:08.514846 CURRENT: corrupted content: "<<<<<<< HEAD\nMANIFEST-000131\n=======\nMANIFEST-000119\n>>>>>>> 3a20364e5adf6b887c7d8e23f5a623995a128026\n"
+13:10:08.514884 CURRENT.bak: corrupted content: "<<<<<<< HEAD\nMANIFEST-000129\n=======\nMANIFEST-000117\n>>>>>>> 3a20364e5adf6b887c7d8e23f5a623995a128026\n"
+=============== Mar 27, 2022 (CST) ===============
+13:10:08.515212 log@legend F·NumFile S·FileSize N·Entry C·BadEntry B·BadBlock Ke·KeyError D·DroppedEntry L·Level Q·SeqNum T·TimeElapsed
+13:10:08.515338 CURRENT: corrupted content: "<<<<<<< HEAD\nMANIFEST-000131\n=======\nMANIFEST-000119\n>>>>>>> 3a20364e5adf6b887c7d8e23f5a623995a128026\n"
+13:10:08.515377 CURRENT.bak: corrupted content: "<<<<<<< HEAD\nMANIFEST-000129\n=======\nMANIFEST-000117\n>>>>>>> 3a20364e5adf6b887c7d8e23f5a623995a128026\n"
+=============== Mar 27, 2022 (CST) ===============
+13:10:08.517101 log@legend F·NumFile S·FileSize N·Entry C·BadEntry B·BadBlock Ke·KeyError D·DroppedEntry L·Level Q·SeqNum T·TimeElapsed
+13:10:08.519549 CURRENT: corrupted content: "<<<<<<< HEAD\nMANIFEST-000131\n=======\nMANIFEST-000119\n>>>>>>> 3a20364e5adf6b887c7d8e23f5a623995a128026\n"
+13:10:08.519612 CURRENT.bak: corrupted content: "<<<<<<< HEAD\nMANIFEST-000129\n=======\nMANIFEST-000117\n>>>>>>> 3a20364e5adf6b887c7d8e23f5a623995a128026\n"
+=============== Mar 27, 2022 (CST) ===============
+13:10:08.521719 log@legend F·NumFile S·FileSize N·Entry C·BadEntry B·BadBlock Ke·KeyError D·DroppedEntry L·Level Q·SeqNum T·TimeElapsed
+13:10:08.521909 CURRENT: corrupted content: "<<<<<<< HEAD\nMANIFEST-000131\n=======\nMANIFEST-000119\n>>>>>>> 3a20364e5adf6b887c7d8e23f5a623995a128026\n"
+13:10:08.521980 CURRENT.bak: corrupted content: "<<<<<<< HEAD\nMANIFEST-000129\n=======\nMANIFEST-000117\n>>>>>>> 3a20364e5adf6b887c7d8e23f5a623995a128026\n"
+=============== Mar 27, 2022 (CST) ===============
+13:10:08.522787 log@legend F·NumFile S·FileSize N·Entry C·BadEntry B·BadBlock Ke·KeyError D·DroppedEntry L·Level Q·SeqNum T·TimeElapsed
+13:10:08.522915 CURRENT: corrupted content: "<<<<<<< HEAD\nMANIFEST-000131\n=======\nMANIFEST-000119\n>>>>>>> 3a20364e5adf6b887c7d8e23f5a623995a128026\n"
+13:10:08.522964 CURRENT.bak: corrupted content: "<<<<<<< HEAD\nMANIFEST-000129\n=======\nMANIFEST-000117\n>>>>>>> 3a20364e5adf6b887c7d8e23f5a623995a128026\n"
+=============== Mar 27, 2022 (CST) ===============
+13:10:08.523554 log@legend F·NumFile S·FileSize N·Entry C·BadEntry B·BadBlock Ke·KeyError D·DroppedEntry L·Level Q·SeqNum T·TimeElapsed
+13:10:08.523671 CURRENT: corrupted content: "<<<<<<< HEAD\nMANIFEST-000131\n=======\nMANIFEST-000119\n>>>>>>> 3a20364e5adf6b887c7d8e23f5a623995a128026\n"
+13:10:08.523745 CURRENT.bak: corrupted content: "<<<<<<< HEAD\nMANIFEST-000129\n=======\nMANIFEST-000117\n>>>>>>> 3a20364e5adf6b887c7d8e23f5a623995a128026\n"
+=============== Mar 27, 2022 (CST) ===============
+13:10:08.524104 log@legend F·NumFile S·FileSize N·Entry C·BadEntry B·BadBlock Ke·KeyError D·DroppedEntry L·Level Q·SeqNum T·TimeElapsed
+13:10:08.524277 CURRENT: corrupted content: "<<<<<<< HEAD\nMANIFEST-000131\n=======\nMANIFEST-000119\n>>>>>>> 3a20364e5adf6b887c7d8e23f5a623995a128026\n"
+13:10:08.524326 CURRENT.bak: corrupted content: "<<<<<<< HEAD\nMANIFEST-000129\n=======\nMANIFEST-000117\n>>>>>>> 3a20364e5adf6b887c7d8e23f5a623995a128026\n"
