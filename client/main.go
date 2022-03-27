@@ -299,11 +299,6 @@ func test() {
 	for i := 0; i < len(keys); i++ {
 		key := keys[i]
 		value := values[i]
-		// addr := serverAddress[idx]
-		// conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
-		// check(err)d
-		// defer conn.Close()
-		// c := pb.NewStorageClient(conn)
 
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
 		defer cancel()

@@ -1,1 +1,1 @@
-./bin/server --shard_idx=$1 & >> log
+./bin/serverLevelDB --shard_idx=$1 & >> log
