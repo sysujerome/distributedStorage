@@ -15,6 +15,7 @@ import (
 	pb "storage/kvstore"
 	common "storage/util/common"
 	crc16 "storage/util/crc16"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -24,7 +25,7 @@ import (
 )
 
 var (
-	db             map[string]string
+	db             DataBase
 	operations     [][]string
 	serversAddress map[int64]string
 	serversStatus  map[int64]string
@@ -42,6 +43,7 @@ var (
 	overflowDB *leveldb.DB
 	spliting   int64
 	version    int64
+	confMutex  sync.RWMutex
 )
 
 type server struct {
@@ -64,9 +66,9 @@ func (s *server) Get(ctx context.Context, in *pb.GetRequest) (*pb.GetReply, erro
 
 	if atomic.LoadInt64(&spliting) > 0 {
 		// operations = append(operations, []string{"get", in.GetKey()})
-		value, found := db[in.GetKey()]
+		found := db.get(in.GetKey())
 		if found {
-			return &pb.GetReply{Result: value, Status: statusCode.Ok}, nil
+			return &pb.GetReply{Result: "", Status: statusCode.Ok}, nil
 		} else {
 			// 从溢出表中查找
 			// data, err := overflowDB.Get([]byte("key"), nil)
@@ -98,7 +100,7 @@ func (s *server) Get(ctx context.Context, in *pb.GetRequest) (*pb.GetReply, erro
 
 		return &pb.GetReply{Result: "", Status: statusCode.Stored, Err: errorCode.Stored}, nil
 	}
-	value, found := db[in.GetKey()]
+	found := db.get(in.GetKey())
 	if !found {
 		// data, err := overflowDB.Get([]byte(in.GetKey()), nil)
 		// if err != nil {
@@ -109,7 +111,7 @@ func (s *server) Get(ctx context.Context, in *pb.GetRequest) (*pb.GetReply, erro
 		// 存储在内部
 		return &pb.GetReply{Result: "", Err: errorCode.NotFound, Status: statusCode.Failed}, nil
 	}
-	return &pb.GetReply{Result: value, Status: statusCode.Ok}, nil
+	return &pb.GetReply{Result: "", Status: statusCode.Ok}, nil
 }
 
 func (s *server) Set(ctx context.Context, in *pb.SetRequest) (*pb.SetReply, error) {
@@ -126,23 +128,20 @@ func (s *server) Set(ctx context.Context, in *pb.SetRequest) (*pb.SetReply, erro
 	if atomic.LoadInt64(&spliting) > 0 {
 		// time.Sleep(time.Millisecond)
 		// fmt.Printf("-")
-		operations = append(operations, []string{"set", in.GetKey(), in.GetValue()})
+		operations = append(operations, []string{"set", in.GetKey()})
 		return &pb.SetReply{Result: "", Status: statusCode.Stored, Err: errorCode.Stored}, nil
 	}
 	// }
 
-	if len(db) == int(serversMaxKey[*shardIdx]) {
+	if int64(db.len) == serversMaxKey[*shardIdx] {
 		// 继续放在本地db上
-		db[in.GetKey()] = in.GetValue()
+		// db[in.GetKey()] = in.GetValue()
+		db.set(in.GetKey())
 		if canSplit {
 			split()
 		}
 	}
-	db[in.GetKey()] = in.GetValue()
-	if db[in.GetKey()] != in.GetValue() {
-		panic("error")
-		return &pb.SetReply{Result: "", Status: statusCode.Failed, Err: errorCode.NotDefined}, nil
-	}
+	db.set(in.GetKey())
 	return &pb.SetReply{Status: statusCode.Ok}, nil
 }
 
@@ -157,9 +156,9 @@ func (s *server) Del(ctx context.Context, in *pb.DelRequest) (*pb.DelReply, erro
 		operations = append(operations, []string{"del", in.GetKey()})
 		return &pb.DelReply{Result: 0, Status: statusCode.Stored, Err: errorCode.Stored}, nil
 	}
-	delete(db, in.GetKey())
-	_, found := db[in.GetKey()]
-	if found {
+	// delete(db, in.GetKey())
+	success := db.del(in.GetKey())
+	if success {
 		return &pb.DelReply{Result: 0, Status: statusCode.Failed, Err: errorCode.NotDefined}, nil
 	}
 	return &pb.DelReply{Result: 1, Status: statusCode.Ok}, nil
@@ -190,13 +189,11 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 	// log.Printf("Received get key: %v", in.GetKey())
 
 	// 分裂时一直新建连接会出现too many open files错误
-	var conns []*grpc.ClientConn
 	var clients []pb.StorageClient
 	for idx := 0; idx < len(serversAddress); idx++ {
 		addr := serversAddress[int64(idx)]
 		conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		check(err)
-		conns = append(conns, conn)
 		c := pb.NewStorageClient(conn)
 		clients = append(clients, c)
 	}
@@ -224,7 +221,6 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 		// defer conn.Close()
 		// c := pb.NewStorageClient(conn)
 		// Contact the server and print out its response.
-		
 
 		reply, err := clients[secondIdx].WakeUp(ctx, &pb.WakeRequest{})
 		check(err)
@@ -243,40 +239,66 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 
 		// fmt.Printf("%s : 开始分裂....\n", serversAddress[secondIdx])
 		count := 0
-		for key, value := range db {
-			delete(db, key)
-			if hashFunc(key) == secondIdx {
-				reply1, err := clients[secondIdx].Set(ctx, &pb.SetRequest{Key: key, Value: value})
-				check(err)
-				if reply1.GetStatus() != statusCode.Ok  && reply1.GetStatus() != statusCode.Stored {
-					for reply1.GetStatus() == statusCode.Moved {
-						reply1, err = clients[int(reply1.GetTarget())].Set(ctx, &pb.SetRequest{Key: key, Value: value})
-						check(err)
-					}
+		// for key, value := range db {
+		// 	delete(db, key)
+		// 	if hashFunc(key) == secondIdx {
+		// 		reply1, err := clients[secondIdx].Set(ctx, &pb.SetRequest{Key: key, Value: value})
+		// 		check(err)
+		// 		if reply1.GetStatus() != statusCode.Ok && reply1.GetStatus() != statusCode.Stored {
+		// 			for reply1.GetStatus() == statusCode.Moved {
+		// 				reply1, err = clients[int(reply1.GetTarget())].Set(ctx, &pb.SetRequest{Key: key, Value: value})
+		// 				check(err)
+		// 			}
+		// 			if reply1.GetStatus() != statusCode.Ok && reply1.GetStatus() != statusCode.Stored {
+		// 				fmt.Println(reply1.GetStatus())
+		// 				fmt.Println("出错。。。")
+		// 				panic(reply1.GetErr())
+		// 			}
+		// 		}
+		// 		count++
+		// 	} else {
+		// 		reply2, err := clients[*shardIdx].Set(ctx, &pb.SetRequest{Key: key, Value: value})
+		// 		check(err)
+		// 		if reply2.GetStatus() != statusCode.Ok && reply2.GetStatus() != statusCode.Stored {
+		// 			for reply2.GetStatus() == statusCode.Moved {
+		// 				reply2, err = clients[int(reply2.GetTarget())].Set(ctx, &pb.SetRequest{Key: key, Value: value})
+		// 				check(err)
+		// 			}
+		// 			if reply2.GetStatus() != statusCode.Ok && reply2.GetStatus() != statusCode.Stored {
+		// 				fmt.Println(reply2.GetStatus())
+		// 				fmt.Println("出错。。。")
+		// 				panic(reply2.GetErr())
+		// 			}
+		// 		}
+		// 	}
+		// }
+
+		for index := 0; index < length; index++ {
+			db.slots[index].Lock()
+			tempData := make([]string, 0) //学习redis来进行rehash
+			for _, key := range db.slots[index].data {
+				if hashFunc(key) == secondIdx {
+					reply1, err := clients[secondIdx].Set(ctx, &pb.SetRequest{Key: key})
+					check(err)
 					if reply1.GetStatus() != statusCode.Ok && reply1.GetStatus() != statusCode.Stored {
-						fmt.Println(reply1.GetStatus())
-						fmt.Println("出错。。。")
-						panic(reply1.GetErr())
+						for reply1.GetStatus() == statusCode.Moved {
+							reply1, err = clients[int(reply1.GetTarget())].Set(ctx, &pb.SetRequest{Key: key})
+							check(err)
+						}
+						if reply1.GetStatus() != statusCode.Ok && reply1.GetStatus() != statusCode.Stored {
+							fmt.Println(reply1.GetStatus())
+							fmt.Println("出错。。。")
+							panic(reply1.GetErr())
+						}
 					}
-				}
-				count++
-			} else {
-				reply2, err := clients[*shardIdx].Set(ctx, &pb.SetRequest{Key: key, Value: value})
-				check(err)
-				if reply2.GetStatus() != statusCode.Ok && reply2.GetStatus() != statusCode.Stored {
-					for reply2.GetStatus() == statusCode.Moved {
-						reply2, err = clients[int(reply2.GetTarget())].Set(ctx, &pb.SetRequest{Key: key, Value: value})
-						check(err)
-					}
-					if reply2.GetStatus() != statusCode.Ok && reply2.GetStatus() != statusCode.Stored {
-						fmt.Println(reply2.GetStatus())
-						fmt.Println("出错。。。")
-						panic(reply2.GetErr())
-					}
+					count++
+				} else {
+					tempData = append(tempData, key)
 				}
 			}
+			db.slots[index].data = tempData
+			db.slots[index].Unlock()
 		}
-		
 
 		serversStatus[*shardIdx] = serverStatus.Working
 		syncConf()
@@ -288,9 +310,10 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 			case "set":
 				idx := hashFunc(operation[1])
 				if idx == *shardIdx {
-					db[operation[1]] = db[operation[2]]
+					// db[operation[1]] = db[operation[2]]
+					db.set(operation[1])
 				} else {
-					reply, err := clients[idx].Set(ctx, &pb.SetRequest{Key: operation[1], Value: operation[2]})
+					reply, err := clients[idx].Set(ctx, &pb.SetRequest{Key: operation[1]})
 					if err != nil {
 						panic(err)
 					}
@@ -303,14 +326,14 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 				// delete(db, operation[1])
 				idx := hashFunc(operation[1])
 				if idx == *shardIdx {
-					db[operation[1]] = db[operation[2]]
+					// db[operation[1]] = db[operation[2]]
+					db.del(operation[1])
 				} else {
 					clients[idx].Del(ctx, &pb.DelRequest{Key: operation[1]})
 				}
 			}
 		}
 		serversStatus[*shardIdx] = serverStatus.Working
-		return
 	}
 
 	// mutex.Lock()
@@ -335,9 +358,10 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 }
 
 func (s *server) Scan(ctx context.Context, in *pb.ScanRequest) (*pb.ScanReply, error) {
-	count := len(db)
+	count := db.len
 	result := serversAddress[*shardIdx] + "\n"
-	result += fmt.Sprintf("%s", db)
+	// result += fmt.Sprintf("%s", db.scan())
+	result += db.scan()
 	return &pb.ScanReply{Result: result, Status: statusCode.Ok, Count: int64(count), Version: version}, nil
 }
 
@@ -457,14 +481,13 @@ func check(e error) {
 func initConf() {
 	flag.Parse()
 
-	db = make(map[string]string)
 	overflowDB, _ = leveldb.OpenFile("./overflow.db", nil)
 	// check(err)
 	operations = make([][]string, 0)
 	serversAddress = make(map[int64]string)
 	serversStatus = make(map[int64]string)
 	serversMaxKey = make(map[int64]int64)
-	canSplit = true
+	canSplit = false
 	atomic.StoreInt64(&spliting, 0)
 	defer flag.Parse()
 	curPath, err := os.Getwd()
@@ -516,7 +539,7 @@ func main() {
 }
 
 func printConf() {
-	fmt.Printf("db:\n%s\n", db)
+	fmt.Printf("db:\n%s\n", db.scan())
 	// fmt.Printf("servers:\n%s\n", serversAddress)
 	for idx, addr := range serversAddress {
 		fmt.Printf("%d %s\t", idx, addr)
