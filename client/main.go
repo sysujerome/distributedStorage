@@ -91,6 +91,8 @@ func main() {
 		operations := strings.Split(string(data), " ")
 
 		switch operations[0] {
+		case "conf":
+			printConf()
 		case "scan":
 			scan(operations)
 		case "get":
@@ -101,7 +103,7 @@ func main() {
 		case "test":
 			// go test()
 			// go test()
-			// go test()
+			// test()
 			ConcurrenceTest()
 		case "quit":
 			for _, conn := range conns {
@@ -583,7 +585,7 @@ func ConcurrenceTest() {
 		}
 	}
 
-	routineCount := 30
+	routineCount := 3
 	for i := 0; i < routineCount; i++ {
 		go test(i, routineCount)
 	}

@@ -19,31 +19,35 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/syndtr/goleveldb/leveldb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-var (
-	db             DataBase
-	operations     [][]string
+// 集群的元数据
+type Meta struct {
+	sync.RWMutex   //避免对元数据的竞态访问
 	serversAddress map[int64]string
 	serversStatus  map[int64]string
 	serversMaxKey  map[int64]int64
-	shardIdx       = flag.Int64("shard_idx", 0, "the index of this shard node")
-	next           = flag.Int64("next", 0, "the spilt node pointer")
-	level          = flag.Int64("level", 0, "the initial level of hash function")
-	hashSize       = flag.Int64("hash_size", 4, "the initial count of hash number")
-	conf           = flag.String("conf", "conf.json", "the defaulted configure file")
-	statusCode     common.Status
-	errorCode      common.Error
-	serverStatus   common.ServerStatus
-	canSplit       bool
+	next           int64
+	level          int64
+	hashSize       int64
+	version        int64
+}
+
+var (
+	meta         Meta //集群的元数据
+	db           DataBase
+	operations   [][]string
+	shardIdx     = flag.Int64("shard_idx", 0, "the index of this shard node")
+	conf         = flag.String("conf", "conf.json", "the defaulted configure file")
+	statusCode   common.Status
+	errorCode    common.Error
+	serverStatus common.ServerStatus
+	canSplit     bool
 	// mutex          sync.Mutex
-	overflowDB *leveldb.DB
-	spliting   int64
-	version    int64
-	confMutex  sync.RWMutex
+	spliting  int64
+	confMutex sync.RWMutex
 )
 
 type server struct {
@@ -52,18 +56,20 @@ type server struct {
 
 func (s *server) Get(ctx context.Context, in *pb.GetRequest) (*pb.GetReply, error) {
 
+	meta.RLock()
+	meta0 := meta
+	meta.RUnlock()
 	// 检查conf，判断该key是否为存在该节点上
 	if hashFunc(in.GetKey()) != *shardIdx {
 		target := hashFunc(in.GetKey())
 		if target != *shardIdx {
-			return &pb.GetReply{Result: "", Status: statusCode.Moved, Err: errorCode.Moved, Target: target, Version: version}, nil
+			return &pb.GetReply{Result: "", Status: statusCode.Moved, Err: errorCode.Moved, Target: target, Version: meta0.version}, nil
 		}
 	}
 
-	if serversStatus[*shardIdx] == serverStatus.Sleep {
-		return &pb.GetReply{Result: "", Status: statusCode.Failed, Err: errorCode.NotWorking, Version: version}, nil
+	if meta0.serversStatus[*shardIdx] == serverStatus.Sleep {
+		return &pb.GetReply{Result: "", Status: statusCode.Failed, Err: errorCode.NotWorking, Version: meta0.version}, nil
 	}
-
 	if atomic.LoadInt64(&spliting) > 0 {
 		// operations = append(operations, []string{"get", in.GetKey()})
 		found := db.get(in.GetKey())
@@ -75,11 +81,11 @@ func (s *server) Get(ctx context.Context, in *pb.GetRequest) (*pb.GetReply, erro
 			// if (err != nil) {
 			// 	return &pb.GetReply{Result: string(data), Status: statusCode.Ok}, nil
 			// } else {
-			secondIdx := int64(math.Pow(2, float64(*level)))*(*hashSize) + *shardIdx
-			if int(secondIdx) >= len(serversAddress) {
+			secondIdx := int64(math.Pow(2, float64(meta0.level)))*(meta0.hashSize) + *shardIdx
+			if int(secondIdx) >= len(meta0.serversAddress) {
 				return &pb.GetReply{Result: "", Status: statusCode.Failed, Err: errorCode.NotFound}, nil
 			}
-			target := serversAddress[secondIdx]
+			target := meta0.serversAddress[secondIdx]
 			conn, err := grpc.Dial(target, grpc.WithTransportCredentials(insecure.NewCredentials()))
 			check(err)
 			defer conn.Close()
@@ -91,9 +97,9 @@ func (s *server) Get(ctx context.Context, in *pb.GetRequest) (*pb.GetReply, erro
 			reply, err := c.Get(ctx, &pb.GetRequest{Key: in.GetKey()})
 			check(err)
 			if reply.GetStatus() == statusCode.Ok {
-				return &pb.GetReply{Result: reply.GetResult(), Status: statusCode.Ok, Version: version}, nil
+				return &pb.GetReply{Result: reply.GetResult(), Status: statusCode.Ok, Version: meta0.version}, nil
 			} else {
-				return &pb.GetReply{Result: "", Status: statusCode.Failed, Err: errorCode.NotFound, Version: version}, nil
+				return &pb.GetReply{Result: "", Status: statusCode.Failed, Err: errorCode.NotFound, Version: meta0.version}, nil
 			}
 			// }
 		}
@@ -115,14 +121,17 @@ func (s *server) Get(ctx context.Context, in *pb.GetRequest) (*pb.GetReply, erro
 }
 
 func (s *server) Set(ctx context.Context, in *pb.SetRequest) (*pb.SetReply, error) {
-	if serversStatus[*shardIdx] == serverStatus.Sleep {
+	meta.RLock()
+	meta0 := meta
+	meta.RUnlock()
+	if meta0.serversStatus[*shardIdx] == serverStatus.Sleep {
 		return &pb.SetReply{Result: "", Status: statusCode.Failed, Err: errorCode.NotWorking}, nil
 	}
 	// 检查conf，判断该key是否为存在该节点上
 	if hashFunc(in.GetKey()) != *shardIdx {
 		target := hashFunc(in.GetKey())
 		if target != *shardIdx {
-			return &pb.SetReply{Result: "", Status: statusCode.Moved, Err: errorCode.Moved, Target: target, Version: version}, nil
+			return &pb.SetReply{Result: "", Status: statusCode.Moved, Err: errorCode.Moved, Target: target, Version: meta0.version}, nil
 		}
 	}
 	if atomic.LoadInt64(&spliting) > 0 {
@@ -133,7 +142,7 @@ func (s *server) Set(ctx context.Context, in *pb.SetRequest) (*pb.SetReply, erro
 	}
 	// }
 
-	if int64(db.len) == serversMaxKey[*shardIdx] {
+	if int64(db.len) == meta0.serversMaxKey[*shardIdx] {
 		// 继续放在本地db上
 		// db[in.GetKey()] = in.GetValue()
 		db.set(in.GetKey())
@@ -146,7 +155,10 @@ func (s *server) Set(ctx context.Context, in *pb.SetRequest) (*pb.SetReply, erro
 }
 
 func (s *server) Del(ctx context.Context, in *pb.DelRequest) (*pb.DelReply, error) {
-	if serversStatus[*shardIdx] == serverStatus.Sleep {
+	meta.RLock()
+	meta0 := meta
+	meta.RUnlock()
+	if meta0.serversStatus[*shardIdx] == serverStatus.Sleep {
 		return &pb.DelReply{Result: 0, Status: statusCode.Failed, Err: errorCode.NotWorking}, nil
 	}
 
@@ -165,11 +177,14 @@ func (s *server) Del(ctx context.Context, in *pb.DelRequest) (*pb.DelReply, erro
 }
 
 func split() {
-	if *next >= int64(len(serversAddress)) {
+	meta.RLock()
+	meta0 := meta
+	meta.RUnlock()
+	if meta0.next >= int64(len(meta0.serversAddress)) {
 		// fmt.Println("分裂失败, 节点满了。。。")
 		return
 	}
-	addr := serversAddress[*next]
+	addr := meta0.serversAddress[meta0.next]
 	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	check(err)
 	defer conn.Close()
@@ -188,10 +203,13 @@ func split() {
 func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply, error) {
 	// log.Printf("Received get key: %v", in.GetKey())
 
+	meta.RLock()
+	meta0 := meta
+	meta.RUnlock()
 	// 分裂时一直新建连接会出现too many open files错误
 	var clients []pb.StorageClient
-	for idx := 0; idx < len(serversAddress); idx++ {
-		addr := serversAddress[int64(idx)]
+	for idx := 0; idx < len(meta0.serversAddress); idx++ {
+		addr := meta0.serversAddress[int64(idx)]
 		conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		check(err)
 		c := pb.NewStorageClient(conn)
@@ -201,19 +219,21 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 	defer cancel()
 
 	splitInside := func() { // 内部元素分裂
-		// fmt.Printf("%s : 节点分裂中....\n", serversAddress[*shardIdx])
-		secondIdx := int64(math.Pow(2, float64(*level)))**hashSize + *shardIdx
-		if secondIdx >= int64(len(serversAddress)) {
+		fmt.Printf("%s:  %s : 节点分裂中....\n", time.Now().Format("2006-01-02 15:04:05"), meta0.serversAddress[*shardIdx])
+		secondIdx := int64(math.Pow(2, float64(meta0.level)))*meta0.hashSize + *shardIdx
+		if secondIdx >= int64(len(meta0.serversAddress)) {
 			// fmt.Printf("%s : 节点数满了....\n", serversAddress[*shardIdx])
 			canSplit = false
 			return
 		}
-
-		*next++
-		if *next == int64(math.Pow(2, float64(*level)))**hashSize {
-			*next = 0
-			*level++
+		meta.Lock()
+		meta0.next++
+		if meta0.next == int64(math.Pow(2, float64(meta0.level)))*meta0.hashSize {
+			meta0.next = 0
+			meta0.level++
 		}
+		meta0.next = meta.next
+		meta.Unlock()
 		syncConf()
 		// target := serversAddress[secondIdx]
 		// conn, err := grpc.Dial(target, grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -275,7 +295,7 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 
 		for index := 0; index < length; index++ {
 			db.slots[index].Lock()
-			tempData := make([]string, 0) //学习redis来进行rehash
+			tempData := make([]string, 0) //学习redis来进行渐进性rehash
 			for _, key := range db.slots[index].data {
 				if hashFunc(key) == secondIdx {
 					reply1, err := clients[secondIdx].Set(ctx, &pb.SetRequest{Key: key})
@@ -300,7 +320,9 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 			db.slots[index].Unlock()
 		}
 
-		serversStatus[*shardIdx] = serverStatus.Working
+		meta.Lock()
+		meta.serversStatus[*shardIdx] = serverStatus.Working
+		meta.Unlock()
 		syncConf()
 		// fmt.Printf("%s : 分裂完成....\n", serversAddress[secondIdx])
 		// 处理存起来的操作
@@ -333,19 +355,25 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 				}
 			}
 		}
-		serversStatus[*shardIdx] = serverStatus.Working
+		meta.Lock()
+		meta.serversStatus[*shardIdx] = serverStatus.Working
+		meta.Unlock()
 	}
 
-	// mutex.Lock()
-	serversStatus[*shardIdx] = serverStatus.Spliting
+	meta.Lock()
+	meta.serversStatus[*shardIdx] = serverStatus.Spliting
+	meta.Unlock()
 	atomic.AddInt64(&spliting, 1)
 	// mutex.Unlock()
 	splitInside()
 
 	// mutex.Lock()
-	serversStatus[*shardIdx] = serverStatus.Working
+	meta.Lock()
+	meta.serversStatus[*shardIdx] = serverStatus.Working
 	atomic.AddInt64(&spliting, -1)
-	version++
+	meta.version++
+	meta.Unlock()
+	meta0.version++
 	syncConf()
 	// mutex.Unlock()
 	// if full {
@@ -354,38 +382,45 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 	// 	return &pb.SplitReply{Status: statusCode.Ok, Result: 0, Full: true}, nil
 	// }
 
-	return &pb.SplitReply{Status: statusCode.Ok, Version: version}, nil
+	return &pb.SplitReply{Status: statusCode.Ok, Version: meta0.version}, nil
 }
 
 func (s *server) Scan(ctx context.Context, in *pb.ScanRequest) (*pb.ScanReply, error) {
+
+	meta.RLock()
+	meta0 := meta
+	meta.RUnlock()
 	count := db.len
-	result := serversAddress[*shardIdx] + "\n"
+	result := meta0.serversAddress[*shardIdx] + "\n"
 	// result += fmt.Sprintf("%s", db.scan())
 	result += db.scan()
-	return &pb.ScanReply{Result: result, Status: statusCode.Ok, Count: int64(count), Version: version}, nil
+	return &pb.ScanReply{Result: result, Status: statusCode.Ok, Count: int64(count), Version: meta0.version}, nil
 }
 
 func syncConf() {
+	meta.RLock()
+	meta0 := meta
+	meta.RUnlock()
 	request := pb.SyncConfRequest{}
 	request.Begin = *shardIdx
-	request.HashSize = *hashSize
-	request.Level = *level
-	request.Next = *next
+	request.HashSize = meta0.hashSize
+	request.Level = meta0.level
+	request.Next = meta0.next
 	request.Server = make([]*pb.SyncConfRequest_ServConf, 0)
 	request.CanSplit = canSplit
-	for idx, addr := range serversAddress {
+	for idx, addr := range meta0.serversAddress {
 		var server pb.SyncConfRequest_ServConf
 		server.Address = addr
 		server.Idx = idx
-		server.MaxKey = serversMaxKey[idx]
-		server.Status = serversStatus[idx]
+		server.MaxKey = meta0.serversMaxKey[idx]
+		server.Status = meta0.serversStatus[idx]
 		request.Server = append(request.Server, &server)
 	}
 	target := *shardIdx + 1
-	if target == int64(len(serversAddress)) {
+	if target == int64(len(meta0.serversAddress)) {
 		target = 0
 	}
-	serv := serversAddress[target]
+	serv := meta0.serversAddress[target]
 	conn, err := grpc.Dial(serv, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	check(err)
 	c := pb.NewStorageClient(conn)
@@ -394,36 +429,48 @@ func syncConf() {
 	reply, err := c.SyncConf(ctx, &request)
 	check(err)
 	if reply.GetStatus() != statusCode.Ok {
-		fmt.Printf("%s : 同步失败。。。\n", serversAddress[*shardIdx])
+		fmt.Printf("%s : 同步失败。。。\n", meta0.serversAddress[*shardIdx])
 	}
 }
 
 func (s *server) SyncConf(ctx context.Context, in *pb.SyncConfRequest) (*pb.SyncConfReply, error) {
+	meta.RLock()
+	version := meta.version
+	meta.RUnlock()
 	if in.GetBegin() == *shardIdx {
 		return &pb.SyncConfReply{Status: statusCode.Ok, Result: "同步结束", Version: version}, nil
 	}
-	// fmt.Printf("%s : 节点同步中...\n", serversAddress[*shardIdx])
-	*next = in.GetNext()
-	*level = in.GetLevel()
-	*hashSize = in.GetHashSize()
-	canSplit = in.GetCanSplit()
-	for k := range serversAddress {
-		delete(serversAddress, k)
-		delete(serversAddress, k)
-		delete(serversAddress, k)
-	}
+	// 更新集群元数据
+	meta.Lock()
+	meta.next = in.GetNext()
+	meta.level = in.GetLevel()
+	meta.hashSize = in.GetHashSize()
+
+	// 为啥要先删除呢？
+	// for k := range serversAddress {
+	// 	delete(serversAddress, k)
+	// 	delete(serversMaxKey, k)
+	// 	delete(serversStatus, k)
+	// }
 	for _, serv := range in.GetServer() {
-		serversAddress[serv.Idx] = serv.Address
-		serversMaxKey[serv.Idx] = serv.MaxKey
-		serversStatus[serv.Idx] = serv.Status
+		meta.serversAddress[serv.Idx] = serv.Address
+		meta.serversMaxKey[serv.Idx] = serv.MaxKey
+		meta.serversStatus[serv.Idx] = serv.Status
 	}
+	meta.Unlock()
+	// 线性传递下去
+	// 只要能将meta数据正确传递给下一个节点就行，如果id+1的节点不通就id+2...
 	success := false
 	target := *shardIdx + 1
-	if target == int64(len(serversAddress)) {
+
+	meta.RLock()
+	meta0 := meta
+	meta.RUnlock()
+	if target == int64(len(meta0.serversAddress)) {
 		target = 0
 	}
 	for !success {
-		serv := serversAddress[target]
+		serv := meta0.serversAddress[target]
 		conn, err := grpc.Dial(serv, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		check(err)
 		c := pb.NewStorageClient(conn)
@@ -438,7 +485,7 @@ func (s *server) SyncConf(ctx context.Context, in *pb.SyncConfRequest) (*pb.Sync
 		if target == in.GetBegin() {
 			success = true
 		}
-		if target == int64(len(serversAddress)) {
+		if target == int64(len(meta0.serversAddress)) {
 			target = 0
 		}
 	}
@@ -446,30 +493,42 @@ func (s *server) SyncConf(ctx context.Context, in *pb.SyncConfRequest) (*pb.Sync
 }
 
 func (s *server) GetConf(ctx context.Context, in *pb.GetConfRequest) (*pb.GetConfReply, error) {
+
+	meta.RLock()
+	meta0 := meta
+	meta.RUnlock()
 	var reply pb.GetConfReply
-	reply.HashSize = *hashSize
-	reply.Level = *level
-	reply.Next = *next
+	reply.HashSize = meta0.hashSize
+	reply.Level = meta0.level
+	reply.Next = meta0.next
 	reply.Status = statusCode.Ok
-	for idx, addr := range serversAddress {
+	for idx, addr := range meta0.serversAddress {
 		var server pb.GetConfReply_ServConf
 		server.Address = addr
 		server.Idx = idx
-		server.MaxKey = serversMaxKey[idx]
-		server.Status = serversStatus[idx]
+		server.MaxKey = meta0.serversMaxKey[idx]
+		server.Status = meta0.serversStatus[idx]
 		reply.Server = append(reply.Server, &server)
 	}
-	reply.Version = version
+	reply.Version = meta0.version
 	return &reply, nil
 }
 
 func (s *server) WakeUp(ctx context.Context, in *pb.WakeRequest) (*pb.WakeReply, error) {
-	if serversStatus[*shardIdx] != serverStatus.Sleep {
-		return &pb.WakeReply{Status: statusCode.Failed, Result: "该节点不在休眠状态", Version: version}, nil
+	meta.RLock()
+	meta0 := meta
+	meta.RUnlock()
+	fmt.Printf("%s : %s 被唤醒\n", time.Now().Format("2006-01-02 15:04:05"), meta0.serversAddress[*shardIdx])
+	if meta0.serversStatus[*shardIdx] != serverStatus.Sleep {
+		return &pb.WakeReply{Status: statusCode.Failed, Result: "该节点不在休眠状态", Version: meta0.version}, nil
 	}
-	serversStatus[*shardIdx] = serverStatus.Working
+	meta.Lock()
+	meta.serversStatus[*shardIdx] = serverStatus.Working
+	meta.version++
+	meta.Unlock()
+	meta0.version++
 	syncConf()
-	return &pb.WakeReply{Status: statusCode.Ok, Version: version}, nil
+	return &pb.WakeReply{Status: statusCode.Ok, Version: meta0.version}, nil
 }
 
 func check(e error) {
@@ -481,13 +540,14 @@ func check(e error) {
 func initConf() {
 	flag.Parse()
 
-	overflowDB, _ = leveldb.OpenFile("./overflow.db", nil)
 	// check(err)
 	operations = make([][]string, 0)
-	serversAddress = make(map[int64]string)
-	serversStatus = make(map[int64]string)
-	serversMaxKey = make(map[int64]int64)
-	canSplit = false
+	meta.Lock()
+	meta.hashSize = 4
+	meta.serversAddress = make(map[int64]string)
+	meta.serversStatus = make(map[int64]string)
+	meta.serversMaxKey = make(map[int64]int64)
+	canSplit = true
 	atomic.StoreInt64(&spliting, 0)
 	defer flag.Parse()
 	curPath, err := os.Getwd()
@@ -510,22 +570,26 @@ func initConf() {
 		ip := ShardNodeConfs["ip"].(string)
 		port := int64(ShardNodeConfs["base_port"].(float64))
 		address := fmt.Sprintf("%s:%d", ip, port)
-		serversAddress[idx] = address
-		serversStatus[idx] = ShardNodeConfs["status"].(string)
-		serversMaxKey[idx] = int64(ShardNodeConfs["max_key"].(float64))
+		meta.serversAddress[idx] = address
+		meta.serversStatus[idx] = ShardNodeConfs["status"].(string)
+		meta.serversMaxKey[idx] = int64(ShardNodeConfs["max_key"].(float64))
 		// fmt.Println(idx, ip, port)
 	}
-	*level = 0
+	meta.level = 0
+	meta.Unlock()
 	statusCode.Init()
 	errorCode.Init()
 	serverStatus.Init()
 }
 
 func hashFunc(key string) int64 {
+	meta.RLock()
+	meta0 := meta
+	meta.RUnlock()
 	posCRC16 := int64(crc16.Checksum([]byte(key), crc16.IBMTable))
-	pos := posCRC16 % (int64(math.Pow(2.0, float64(*level))) * *hashSize)
-	if pos < *next { // 分裂过了的
-		pos = posCRC16 % (int64(math.Pow(2.0, float64(*level+1))) * *hashSize)
+	pos := posCRC16 % (int64(math.Pow(2.0, float64(meta0.level))) * meta0.hashSize)
+	if pos < meta0.next { // 分裂过了的
+		pos = posCRC16 % (int64(math.Pow(2.0, float64(meta0.level+1))) * meta0.hashSize)
 	}
 	return pos
 	// return 1
@@ -539,32 +603,37 @@ func main() {
 }
 
 func printConf() {
+	meta.RLock()
+	meta0 := meta
+	meta.RUnlock()
 	fmt.Printf("db:\n%s\n", db.scan())
 	// fmt.Printf("servers:\n%s\n", serversAddress)
-	for idx, addr := range serversAddress {
+	for idx, addr := range meta0.serversAddress {
 		fmt.Printf("%d %s\t", idx, addr)
 	}
 	fmt.Println()
 	// fmt.Printf("status:\n%s\n", serversStatus)
-	for idx, maxKey := range serversMaxKey {
+	for idx, maxKey := range meta0.serversMaxKey {
 		fmt.Printf("%d %d\t", idx, maxKey)
 	}
 	fmt.Println()
 
 	// fmt.Printf("maxKey:\n%s\n", serversMaxKey)
-	for idx, status := range serversStatus {
+	for idx, status := range meta0.serversStatus {
 		fmt.Printf("%d %s\t", idx, status)
 	}
 	fmt.Println()
 	fmt.Printf("shardIdx:\n%d\n", *shardIdx)
-	fmt.Printf("next:\n%d\n", *next)
-	fmt.Printf("level:\n%d\n", *level)
-	fmt.Printf("hashSize:\n%d\n", *hashSize)
+	fmt.Printf("next:\n%d\n", meta0.next)
+	fmt.Printf("level:\n%d\n", meta0.level)
+	fmt.Printf("hashSize:\n%d\n", meta0.hashSize)
 	fmt.Printf("conf:\n%s\n", *conf)
 }
 
 func serve() {
-	addr := serversAddress[*shardIdx]
+	meta.RLock()
+	addr := meta.serversAddress[*shardIdx]
+	meta.RUnlock()
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
