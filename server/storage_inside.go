@@ -27,8 +27,6 @@ import (
 type Meta struct {
 	sync.RWMutex   //避免对元数据的竞态访问
 	serversAddress map[int64]string
-	serversStatus  map[int64]string
-	serversMaxKey  map[int64]int64
 	next           int64
 	level          int64
 	hashSize       int64
@@ -46,46 +44,54 @@ var (
 	serverStatus common.ServerStatus
 	canSplit     bool
 	// mutex          sync.Mutex
-	spliting  int64
-	confMutex sync.RWMutex
+	spliting int64
+	maxKey   int64
+	status   int32 // 0 for work, 1 for sleep, 2 for splitting, 3 for full
 )
 
 type server struct {
 	pb.UnimplementedStorageServer
 }
 
-func (s *server) Get(ctx context.Context, in *pb.GetRequest) (*pb.GetReply, error) {
+// // 每个增删改查操作都先检查当前节点状态
+// // bool : 0 -> sleep, 1 -> work
+// // int64 :
+// func checkStatus() (bool, int64) {
 
-	meta.RLock()
-	meta0 := meta
-	meta.RUnlock()
+// }
+
+func (s *server) Get(ctx context.Context, in *pb.GetRequest) (*pb.GetReply, error) {
+	// 先检查当前节点状态
+	if atomic.LoadInt32(&status) == 1 {
+		version := atomic.LoadInt64(&meta.version)
+		return &pb.GetReply{Result: "", Status: statusCode.Failed, Err: errorCode.NotWorking, Version: version}, nil
+	}
+	version := atomic.LoadInt64(&meta.version)
 	// 检查conf，判断该key是否为存在该节点上
 	if hashFunc(in.GetKey()) != *shardIdx {
 		target := hashFunc(in.GetKey())
 		if target != *shardIdx {
-			return &pb.GetReply{Result: "", Status: statusCode.Moved, Err: errorCode.Moved, Target: target, Version: meta0.version}, nil
+			return &pb.GetReply{Result: "", Status: statusCode.Moved, Err: errorCode.Moved, Target: target, Version: version}, nil
 		}
 	}
 
-	if meta0.serversStatus[*shardIdx] == serverStatus.Sleep {
-		return &pb.GetReply{Result: "", Status: statusCode.Failed, Err: errorCode.NotWorking, Version: meta0.version}, nil
-	}
-	if atomic.LoadInt64(&spliting) > 0 {
+	if atomic.LoadInt32(&status) == 2 {
 		// operations = append(operations, []string{"get", in.GetKey()})
 		found := db.get(in.GetKey())
 		if found {
 			return &pb.GetReply{Result: "", Status: statusCode.Ok}, nil
 		} else {
-			// 从溢出表中查找
-			// data, err := overflowDB.Get([]byte("key"), nil)
-			// if (err != nil) {
-			// 	return &pb.GetReply{Result: string(data), Status: statusCode.Ok}, nil
-			// } else {
-			secondIdx := int64(math.Pow(2, float64(meta0.level)))*(meta0.hashSize) + *shardIdx
-			if int(secondIdx) >= len(meta0.serversAddress) {
+			addresses := make(map[int64]string)
+			meta.Lock()
+			for k, v := range meta.serversAddress {
+				addresses[k] = v
+			}
+			meta.Unlock()
+			secondIdx := int64(math.Pow(2, float64(atomic.LoadInt64(&meta.level))))*(atomic.LoadInt64(&meta.hashSize)) + *shardIdx
+			if int(secondIdx) >= len(addresses) {
 				return &pb.GetReply{Result: "", Status: statusCode.Failed, Err: errorCode.NotFound}, nil
 			}
-			target := meta0.serversAddress[secondIdx]
+			target := addresses[secondIdx]
 			conn, err := grpc.Dial(target, grpc.WithTransportCredentials(insecure.NewCredentials()))
 			check(err)
 			defer conn.Close()
@@ -97,14 +103,12 @@ func (s *server) Get(ctx context.Context, in *pb.GetRequest) (*pb.GetReply, erro
 			reply, err := c.Get(ctx, &pb.GetRequest{Key: in.GetKey()})
 			check(err)
 			if reply.GetStatus() == statusCode.Ok {
-				return &pb.GetReply{Result: reply.GetResult(), Status: statusCode.Ok, Version: meta0.version}, nil
+				return &pb.GetReply{Result: reply.GetResult(), Status: statusCode.Ok, Version: version}, nil
 			} else {
-				return &pb.GetReply{Result: "", Status: statusCode.Failed, Err: errorCode.NotFound, Version: meta0.version}, nil
+				return &pb.GetReply{Result: "", Status: statusCode.Failed, Err: errorCode.NotFound, Version: version}, nil
 			}
 			// }
 		}
-
-		return &pb.GetReply{Result: "", Status: statusCode.Stored, Err: errorCode.Stored}, nil
 	}
 	found := db.get(in.GetKey())
 	if !found {
@@ -115,51 +119,57 @@ func (s *server) Get(ctx context.Context, in *pb.GetRequest) (*pb.GetReply, erro
 		// return &pb.GetReply{Result: string(data), Err: "", Status: statusCode.Ok}, nil
 
 		// 存储在内部
-		return &pb.GetReply{Result: "", Err: errorCode.NotFound, Status: statusCode.Failed}, nil
+		return &pb.GetReply{Result: "", Err: errorCode.NotFound, Status: statusCode.Failed, Version: version}, nil
 	}
-	return &pb.GetReply{Result: "", Status: statusCode.Ok}, nil
+	return &pb.GetReply{Result: "", Status: statusCode.Ok, Version: version}, nil
 }
 
 func (s *server) Set(ctx context.Context, in *pb.SetRequest) (*pb.SetReply, error) {
-	meta.RLock()
-	meta0 := meta
-	meta.RUnlock()
-	if meta0.serversStatus[*shardIdx] == serverStatus.Sleep {
-		return &pb.SetReply{Result: "", Status: statusCode.Failed, Err: errorCode.NotWorking}, nil
+	// 先检查当前节点状态
+
+	// fmt.Printf("Income : %s\n", in.GetKey())
+	if atomic.LoadInt32(&status) == 1 {
+		version := atomic.LoadInt64(&meta.version)
+		return &pb.SetReply{Result: "", Status: statusCode.Failed, Err: errorCode.NotWorking, Version: version}, nil
 	}
 	// 检查conf，判断该key是否为存在该节点上
 	if hashFunc(in.GetKey()) != *shardIdx {
 		target := hashFunc(in.GetKey())
+
 		if target != *shardIdx {
-			return &pb.SetReply{Result: "", Status: statusCode.Moved, Err: errorCode.Moved, Target: target, Version: meta0.version}, nil
+			return &pb.SetReply{Result: "", Status: statusCode.Moved,
+				Err: errorCode.Moved, Target: target, Version: atomic.LoadInt64(&meta.version),
+				Next: atomic.LoadInt64(&meta.next), Level: atomic.LoadInt64(&meta.level)}, nil
 		}
 	}
-	if atomic.LoadInt64(&spliting) > 0 {
+	if atomic.LoadInt32(&status) == 2 {
 		// time.Sleep(time.Millisecond)
 		// fmt.Printf("-")
 		operations = append(operations, []string{"set", in.GetKey()})
+		fmt.Printf("Store : %s\n", in.GetKey())
 		return &pb.SetReply{Result: "", Status: statusCode.Stored, Err: errorCode.Stored}, nil
 	}
 	// }
 
-	if int64(db.len) == meta0.serversMaxKey[*shardIdx] {
+	if int64(db.len) >= maxKey {
 		// 继续放在本地db上
-		// db[in.GetKey()] = in.GetValue()
+		// 将maxKey值扩大为1.25倍
+		maxKey = int64(float64(maxKey) * 1.25)
 		db.set(in.GetKey())
 		if canSplit {
 			split()
 		}
+	} else {
+		db.set(in.GetKey())
 	}
-	db.set(in.GetKey())
 	return &pb.SetReply{Status: statusCode.Ok}, nil
 }
 
 func (s *server) Del(ctx context.Context, in *pb.DelRequest) (*pb.DelReply, error) {
-	meta.RLock()
-	meta0 := meta
-	meta.RUnlock()
-	if meta0.serversStatus[*shardIdx] == serverStatus.Sleep {
-		return &pb.DelReply{Result: 0, Status: statusCode.Failed, Err: errorCode.NotWorking}, nil
+	// 先检查当前节点状态
+	if atomic.LoadInt32(&status) == 1 {
+		version := atomic.LoadInt64(&meta.version)
+		return &pb.DelReply{Result: 0, Status: statusCode.Failed, Err: errorCode.NotWorking, Version: version}, nil
 	}
 
 	// log.Printf("Received get key: %v", in.GetKey())
@@ -177,14 +187,17 @@ func (s *server) Del(ctx context.Context, in *pb.DelRequest) (*pb.DelReply, erro
 }
 
 func split() {
-	meta.RLock()
-	meta0 := meta
-	meta.RUnlock()
-	if meta0.next >= int64(len(meta0.serversAddress)) {
+	addresses := make(map[int64]string)
+	meta.Lock()
+	for k, v := range meta.serversAddress {
+		addresses[k] = v
+	}
+	meta.Unlock()
+	if atomic.LoadInt64(&meta.next) >= int64(len(addresses)) {
 		// fmt.Println("分裂失败, 节点满了。。。")
 		return
 	}
-	addr := meta0.serversAddress[meta0.next]
+	addr := addresses[atomic.LoadInt64(&meta.next)]
 	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	check(err)
 	defer conn.Close()
@@ -193,23 +206,77 @@ func split() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
 	defer cancel()
 
-	reply, err := c.Split(ctx, &pb.SplitRequest{})
+	reply, err := c.Split(ctx, &pb.SplitRequest{Next: atomic.LoadInt64(&meta.next), Level: atomic.LoadInt64(&meta.level)})
 	check(err)
-	if reply.GetFull() {
-		// fmt.Println("分裂失败, 节点满了。。。")
+	retry := 0
+	for reply.GetStatus() == statusCode.Moved {
+		retry++
+		if retry > 16 {
+			panic("Too much retry... in split moved.")
+		}
+		// atomic.StoreInt64(&meta.next, reply.GetNext())
+		// atomic.StoreInt64(&meta.level, reply.GetLevel())
+		// panic(fmt.Sprintf("分裂的不是这个节点，想要分裂的节点：%s, 指向的节点：%s", addr, addresses[reply.GetNext()]))
+		addr = addresses[reply.GetNext()]
+		conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		check(err)
+		defer conn.Close()
+		c = pb.NewStorageClient(conn)
+		// Contact the server and print out its response.
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
+		defer cancel()
+		reply, err = c.Split(ctx, &pb.SplitRequest{Next: atomic.LoadInt64(&meta.next), Level: atomic.LoadInt64(&meta.level)})
+		check(err)
 	}
+	if reply.GetStatus() != statusCode.Ok {
+		fmt.Printf("server split : %s\n", reply.GetStatus())
+		panic(fmt.Sprintf("server split failed : %s", addr))
+	}
+	// if reply.GetFull() {
+	// 	// fmt.Println("分裂失败, 节点满了。。。")
+	// }
 }
 
 func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply, error) {
 	// log.Printf("Received get key: %v", in.GetKey())
+	// 先检查当前节点状态
+	if atomic.LoadInt32(&status) == 1 {
+		version := atomic.LoadInt64(&meta.version)
+		return &pb.SplitReply{Result: 0, Status: statusCode.Failed, Err: errorCode.NotWorking, Version: version}, nil
+	}
+	// 排除并发分裂
+	if atomic.LoadInt32(&status) == 2 {
+		version := atomic.LoadInt64(&meta.version)
+		return &pb.SplitReply{Status: statusCode.Ok, Version: version}, nil
+	}
 
+	// 检查集群元数据是否一致
+	// 被分裂过的节点的next,level值相对更新，则通知去新的next节点分裂
+	if atomic.LoadInt64(&meta.next) > in.GetNext() && atomic.LoadInt64(&meta.level) >= in.GetNext() || (atomic.LoadInt64(&meta.level) > in.GetLevel()) {
+		return &pb.SplitReply{Result: 0, Status: statusCode.Moved, Next: atomic.LoadInt64(&meta.next), Level: atomic.LoadInt64(&meta.level)}, nil
+	}
+
+	// 开始分裂
+	// 首先要保证集群的元数据一致性
+	// atomic.SwapInt64(&meta.next, in.GetNext())
+	// atomic.SwapInt64(&meta.level, in.GetLevel())
+
+	// 当前节点的meta.next必须和当前的shardIdx一致
+	idx := atomic.LoadInt64(shardIdx)
+	atomic.SwapInt64(&meta.next, idx)
+
+	addresses := make(map[int64]string)
 	meta.RLock()
-	meta0 := meta
+	for k, v := range meta.serversAddress {
+		addresses[k] = v
+	}
 	meta.RUnlock()
+
 	// 分裂时一直新建连接会出现too many open files错误
+	// 和每个节点建立一个长连接
 	var clients []pb.StorageClient
-	for idx := 0; idx < len(meta0.serversAddress); idx++ {
-		addr := meta0.serversAddress[int64(idx)]
+	for idx := 0; idx < len(addresses); idx++ {
+		addr := addresses[int64(idx)]
 		conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		check(err)
 		c := pb.NewStorageClient(conn)
@@ -219,36 +286,40 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 	defer cancel()
 
 	splitInside := func() { // 内部元素分裂
-		fmt.Printf("%s:  %s : 节点分裂中....\n", time.Now().Format("2006-01-02 15:04:05"), meta0.serversAddress[*shardIdx])
-		secondIdx := int64(math.Pow(2, float64(meta0.level)))*meta0.hashSize + *shardIdx
-		if secondIdx >= int64(len(meta0.serversAddress)) {
-			// fmt.Printf("%s : 节点数满了....\n", serversAddress[*shardIdx])
+		// 原子比较该节点是不是正在分裂，保证只有该节点只分裂一次
+		if !atomic.CompareAndSwapInt32(&status, 0, 2) {
+			return
+		}
+		atomic.StoreInt32(&status, 2)
+		defer atomic.StoreInt32(&status, 0)
+		fmt.Printf("节点分裂中...%s:  %s\n", addresses[*shardIdx], time.Now().Format("2006-01-02 15:04:05"))
+		secondIdx := int64(math.Pow(2, float64(atomic.LoadInt64(&meta.level))))*atomic.LoadInt64(&meta.hashSize) + *shardIdx
+		if secondIdx >= int64(len(addresses)) {
+			fmt.Printf("%s : 节点数满了....\n", addresses[*shardIdx])
 			canSplit = false
 			return
 		}
-		meta.Lock()
-		meta0.next++
-		if meta0.next == int64(math.Pow(2, float64(meta0.level)))*meta0.hashSize {
-			meta0.next = 0
-			meta0.level++
-		}
-		meta0.next = meta.next
-		meta.Unlock()
-		syncConf()
-		// target := serversAddress[secondIdx]
-		// conn, err := grpc.Dial(target, grpc.WithTransportCredentials(insecure.NewCredentials()))
-		// check(err)
-		// defer conn.Close()
-		// c := pb.NewStorageClient(conn)
-		// Contact the server and print out its response.
 
-		reply, err := clients[secondIdx].WakeUp(ctx, &pb.WakeRequest{})
+		// 分裂完成，后置条件：将next指针往后移动
+		atomic.AddInt64(&meta.next, 1)
+		// 一轮分裂已经完成，将next指针归零
+		if atomic.LoadInt64(&meta.next) == int64(math.Pow(2, float64(atomic.LoadInt64(&meta.level))))*atomic.LoadInt64(&meta.hashSize) {
+			atomic.StoreInt64(&meta.next, 0)
+		}
+		// 该节点已经分裂过，所以针对该节点的数据，是需要将level值加1后重新计算的
+		atomic.AddInt64(&meta.level, 1)
+		fmt.Printf("Next : %d\tLevel : %d\n", atomic.LoadInt64(&meta.next), atomic.LoadInt64(&meta.level))
+
+		// 需要将next指针改变之后的数据同步到对应的wakeup节点，不然会出现同一个key的元数据不一致报错  (0->4 ==> 4->0 死循环)
+		reply, err := clients[secondIdx].WakeUp(ctx, &pb.WakeRequest{Next: atomic.LoadInt64(&meta.next), Level: atomic.LoadInt64(&meta.level)})
 		check(err)
 		if reply.GetStatus() != statusCode.Ok {
-			// fmt.Printf("%s %s : 节点唤醒失败....\n", serversAddress[*shardIdx], serversAddress[secondIdx])
+			fmt.Printf("节点唤醒失败 : %s %s ....\n", addresses[*shardIdx], addresses[secondIdx])
+			log.Panicf("err : %s\n", reply.GetErr())
 			return
 		}
-		syncConf()
+		fmt.Printf("节点唤醒成功: %s %s ...\n", addresses[*shardIdx], addresses[secondIdx])
+		// syncConf()
 
 		// thisAddress := serversAddress[]
 		// thisConn, err := grpc.Dial(thisAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -257,60 +328,42 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 		// thisClient := pb.NewStorageClient(thisConn)
 		// Contact the server and print out its response.
 
-		// fmt.Printf("%s : 开始分裂....\n", serversAddress[secondIdx])
+		// fmt.Printf("%d : 开始分裂....\n", shardIdx)
 		count := 0
-		// for key, value := range db {
-		// 	delete(db, key)
-		// 	if hashFunc(key) == secondIdx {
-		// 		reply1, err := clients[secondIdx].Set(ctx, &pb.SetRequest{Key: key, Value: value})
-		// 		check(err)
-		// 		if reply1.GetStatus() != statusCode.Ok && reply1.GetStatus() != statusCode.Stored {
-		// 			for reply1.GetStatus() == statusCode.Moved {
-		// 				reply1, err = clients[int(reply1.GetTarget())].Set(ctx, &pb.SetRequest{Key: key, Value: value})
-		// 				check(err)
-		// 			}
-		// 			if reply1.GetStatus() != statusCode.Ok && reply1.GetStatus() != statusCode.Stored {
-		// 				fmt.Println(reply1.GetStatus())
-		// 				fmt.Println("出错。。。")
-		// 				panic(reply1.GetErr())
-		// 			}
-		// 		}
-		// 		count++
-		// 	} else {
-		// 		reply2, err := clients[*shardIdx].Set(ctx, &pb.SetRequest{Key: key, Value: value})
-		// 		check(err)
-		// 		if reply2.GetStatus() != statusCode.Ok && reply2.GetStatus() != statusCode.Stored {
-		// 			for reply2.GetStatus() == statusCode.Moved {
-		// 				reply2, err = clients[int(reply2.GetTarget())].Set(ctx, &pb.SetRequest{Key: key, Value: value})
-		// 				check(err)
-		// 			}
-		// 			if reply2.GetStatus() != statusCode.Ok && reply2.GetStatus() != statusCode.Stored {
-		// 				fmt.Println(reply2.GetStatus())
-		// 				fmt.Println("出错。。。")
-		// 				panic(reply2.GetErr())
-		// 			}
-		// 		}
-		// 	}
-		// }
-
+		set := func(idx int64, key string) {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
+			defer cancel()
+			reply, err := clients[idx].Set(ctx, &pb.SetRequest{Key: key})
+			check(err)
+			if reply.GetStatus() == statusCode.Moved {
+				fmt.Printf("%s : %d -> %d ... first moved\n", key, idx, reply.GetTarget())
+				fmt.Printf("%s : server next, level : %d %d \n", key, reply.GetNext(), reply.GetLevel())
+				fmt.Printf("%s : local next,  level : %d %d \n", key, atomic.LoadInt64(&meta.next), atomic.LoadInt64(&meta.level))
+				// 更新元数据
+				// atomic.StoreInt64(&meta.next, reply.GetNext())
+				// atomic.StoreInt64(&meta.level, reply.GetLevel())
+				fmt.Printf("%s : local next,  level : %d %d ... after store\n", key, atomic.LoadInt64(&meta.next), atomic.LoadInt64(&meta.level))
+				// 更新后元数据
+				idx = hashFunc(key)
+				if idx != reply.GetTarget() {
+					panic(fmt.Sprintf("%s : server idx, local idx : %d, %d\n", key, reply.GetTarget(), idx))
+				}
+				reply, err = clients[idx].Set(ctx, &pb.SetRequest{Key: key})
+				check(err)
+				if reply.GetStatus() == statusCode.Moved {
+					panic(fmt.Sprintf("%s : %d -> %d second moved, failed.\n", key, idx, reply.GetTarget()))
+				}
+			} else if reply.GetStatus() == statusCode.Failed {
+				panic(fmt.Sprintf("%s : Err : %s", key, reply.GetErr()))
+			}
+		}
+		// 分裂操作核心代码
 		for index := 0; index < length; index++ {
-			db.slots[index].Lock()
 			tempData := make([]string, 0) //学习redis来进行渐进性rehash
+			db.slots[index].Lock()
 			for _, key := range db.slots[index].data {
 				if hashFunc(key) == secondIdx {
-					reply1, err := clients[secondIdx].Set(ctx, &pb.SetRequest{Key: key})
-					check(err)
-					if reply1.GetStatus() != statusCode.Ok && reply1.GetStatus() != statusCode.Stored {
-						for reply1.GetStatus() == statusCode.Moved {
-							reply1, err = clients[int(reply1.GetTarget())].Set(ctx, &pb.SetRequest{Key: key})
-							check(err)
-						}
-						if reply1.GetStatus() != statusCode.Ok && reply1.GetStatus() != statusCode.Stored {
-							fmt.Println(reply1.GetStatus())
-							fmt.Println("出错。。。")
-							panic(reply1.GetErr())
-						}
-					}
+					set(secondIdx, key)
 					count++
 				} else {
 					tempData = append(tempData, key)
@@ -320,16 +373,22 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 			db.slots[index].Unlock()
 		}
 
-		meta.Lock()
-		meta.serversStatus[*shardIdx] = serverStatus.Working
-		meta.Unlock()
+		// meta.Lock()
+		// meta.serversStatus[*shardIdx] = serverStatus.Working
+		// atomic.StoreInt32(&status, 1)
+		// meta.Unlock()
+		// atomic.StoreInt32(&status, 0)
 		syncConf()
 		// fmt.Printf("%s : 分裂完成....\n", serversAddress[secondIdx])
-		// 处理存起来的操作
+		// 内部分裂完成，处理存起来的操作
 		// fmt.Println("处理存起来的操作...")
+		setCount := 0
 		for _, operation := range operations {
+
+			// 计算存起来的set操作有多少，看是否会出现积压过多导致二次分裂的问题
 			switch operation[0] {
 			case "set":
+				setCount++
 				idx := hashFunc(operation[1])
 				if idx == *shardIdx {
 					// db[operation[1]] = db[operation[2]]
@@ -355,26 +414,29 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 				}
 			}
 		}
-		meta.Lock()
-		meta.serversStatus[*shardIdx] = serverStatus.Working
-		meta.Unlock()
+		fmt.Printf("%s 共处理 %d 个set积压操作\n", addresses[idx], setCount)
+
+		// // 分裂完成，后置条件：将next指针往后移动
+		// atomic.AddInt64(&meta.next, 1)
+		// // 一轮分裂已经完成，将next指针归零
+		// if atomic.LoadInt64(&meta.next) == int64(math.Pow(2, float64(atomic.LoadInt64(&meta.level))))*atomic.LoadInt64(&meta.hashSize) {
+		// 	atomic.StoreInt64(&meta.next, 0)
+		// }
+		// fmt.Printf("Next : %d\n", atomic.LoadInt64(&meta.next))
+		// // 该节点已经分裂过，所以针对该节点的数据，是需要将level值加1后重新计算的
+		// atomic.AddInt64(&meta.level, 1)
 	}
 
-	meta.Lock()
-	meta.serversStatus[*shardIdx] = serverStatus.Spliting
-	meta.Unlock()
-	atomic.AddInt64(&spliting, 1)
 	// mutex.Unlock()
 	splitInside()
 
 	// mutex.Lock()
-	meta.Lock()
-	meta.serversStatus[*shardIdx] = serverStatus.Working
-	atomic.AddInt64(&spliting, -1)
-	meta.version++
-	meta.Unlock()
-	meta0.version++
-	syncConf()
+	// meta.version++
+	atomic.AddInt64(&meta.version, 1)
+	// 分裂过后，将该节点的阈值降为原来的4/5
+	maxKeyOld := int64(float64(atomic.LoadInt64(&maxKey)) * 0.8)
+	atomic.StoreInt64(&maxKey, maxKeyOld)
+	// syncConf()
 	// mutex.Unlock()
 	// if full {
 	// 	canSplit = false
@@ -382,45 +444,41 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 	// 	return &pb.SplitReply{Status: statusCode.Ok, Result: 0, Full: true}, nil
 	// }
 
-	return &pb.SplitReply{Status: statusCode.Ok, Version: meta0.version}, nil
+	return &pb.SplitReply{Status: statusCode.Ok, Version: atomic.LoadInt64(&meta.version)}, nil
 }
 
 func (s *server) Scan(ctx context.Context, in *pb.ScanRequest) (*pb.ScanReply, error) {
 
-	meta.RLock()
-	meta0 := meta
-	meta.RUnlock()
 	count := db.len
-	result := meta0.serversAddress[*shardIdx] + "\n"
+	meta.RLock()
+	result := meta.serversAddress[*shardIdx] + "\n"
+	meta.RUnlock()
 	// result += fmt.Sprintf("%s", db.scan())
 	result += db.scan()
-	return &pb.ScanReply{Result: result, Status: statusCode.Ok, Count: int64(count), Version: meta0.version}, nil
+	return &pb.ScanReply{Result: result, Status: statusCode.Ok, Count: int64(count), Version: atomic.LoadInt64(&meta.version)}, nil
 }
 
 func syncConf() {
-	meta.RLock()
-	meta0 := meta
-	meta.RUnlock()
+	return
+	addresses := copyAddress(&meta)
 	request := pb.SyncConfRequest{}
 	request.Begin = *shardIdx
-	request.HashSize = meta0.hashSize
-	request.Level = meta0.level
-	request.Next = meta0.next
+	request.HashSize = atomic.LoadInt64(&meta.hashSize)
+	request.Level = atomic.LoadInt64(&meta.level)
+	request.Next = atomic.LoadInt64(&meta.next)
 	request.Server = make([]*pb.SyncConfRequest_ServConf, 0)
 	request.CanSplit = canSplit
-	for idx, addr := range meta0.serversAddress {
+	for idx, addr := range addresses {
 		var server pb.SyncConfRequest_ServConf
 		server.Address = addr
 		server.Idx = idx
-		server.MaxKey = meta0.serversMaxKey[idx]
-		server.Status = meta0.serversStatus[idx]
 		request.Server = append(request.Server, &server)
 	}
 	target := *shardIdx + 1
-	if target == int64(len(meta0.serversAddress)) {
+	if target == int64(len(addresses)) {
 		target = 0
 	}
-	serv := meta0.serversAddress[target]
+	serv := addresses[target]
 	conn, err := grpc.Dial(serv, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	check(err)
 	c := pb.NewStorageClient(conn)
@@ -429,17 +487,19 @@ func syncConf() {
 	reply, err := c.SyncConf(ctx, &request)
 	check(err)
 	if reply.GetStatus() != statusCode.Ok {
-		fmt.Printf("%s : 同步失败。。。\n", meta0.serversAddress[*shardIdx])
+		fmt.Printf("%s : 同步失败。。。\n", addresses[*shardIdx])
 	}
 }
 
 func (s *server) SyncConf(ctx context.Context, in *pb.SyncConfRequest) (*pb.SyncConfReply, error) {
 	meta.RLock()
 	version := meta.version
+	address := meta.serversAddress[*shardIdx]
 	meta.RUnlock()
 	if in.GetBegin() == *shardIdx {
 		return &pb.SyncConfReply{Status: statusCode.Ok, Result: "同步结束", Version: version}, nil
 	}
+	fmt.Printf("%s : %s, 节点同步\n", time.Now().Format("2006-01-02 15:04:05"), address)
 	// 更新集群元数据
 	meta.Lock()
 	meta.next = in.GetNext()
@@ -454,8 +514,6 @@ func (s *server) SyncConf(ctx context.Context, in *pb.SyncConfRequest) (*pb.Sync
 	// }
 	for _, serv := range in.GetServer() {
 		meta.serversAddress[serv.Idx] = serv.Address
-		meta.serversMaxKey[serv.Idx] = serv.MaxKey
-		meta.serversStatus[serv.Idx] = serv.Status
 	}
 	meta.Unlock()
 	// 线性传递下去
@@ -463,14 +521,12 @@ func (s *server) SyncConf(ctx context.Context, in *pb.SyncConfRequest) (*pb.Sync
 	success := false
 	target := *shardIdx + 1
 
-	meta.RLock()
-	meta0 := meta
-	meta.RUnlock()
-	if target == int64(len(meta0.serversAddress)) {
+	addresses := copyAddress(&meta)
+	if target == int64(len(addresses)) {
 		target = 0
 	}
 	for !success {
-		serv := meta0.serversAddress[target]
+		serv := addresses[target]
 		conn, err := grpc.Dial(serv, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		check(err)
 		c := pb.NewStorageClient(conn)
@@ -485,7 +541,7 @@ func (s *server) SyncConf(ctx context.Context, in *pb.SyncConfRequest) (*pb.Sync
 		if target == in.GetBegin() {
 			success = true
 		}
-		if target == int64(len(meta0.serversAddress)) {
+		if target == int64(len(addresses)) {
 			target = 0
 		}
 	}
@@ -494,41 +550,35 @@ func (s *server) SyncConf(ctx context.Context, in *pb.SyncConfRequest) (*pb.Sync
 
 func (s *server) GetConf(ctx context.Context, in *pb.GetConfRequest) (*pb.GetConfReply, error) {
 
-	meta.RLock()
-	meta0 := meta
-	meta.RUnlock()
+	addresses := copyAddress(&meta)
 	var reply pb.GetConfReply
-	reply.HashSize = meta0.hashSize
-	reply.Level = meta0.level
-	reply.Next = meta0.next
+	reply.HashSize = atomic.LoadInt64(&meta.hashSize)
+	reply.Level = atomic.LoadInt64(&meta.level)
+	reply.Next = atomic.LoadInt64(&meta.next)
 	reply.Status = statusCode.Ok
-	for idx, addr := range meta0.serversAddress {
+	for idx, addr := range addresses {
 		var server pb.GetConfReply_ServConf
 		server.Address = addr
 		server.Idx = idx
-		server.MaxKey = meta0.serversMaxKey[idx]
-		server.Status = meta0.serversStatus[idx]
 		reply.Server = append(reply.Server, &server)
 	}
-	reply.Version = meta0.version
+	reply.Version = atomic.LoadInt64(&meta.version)
+	reply.ShardIdx = atomic.LoadInt64(shardIdx)
+	reply.ServerStatus = atomic.LoadInt32(&status)
 	return &reply, nil
 }
 
 func (s *server) WakeUp(ctx context.Context, in *pb.WakeRequest) (*pb.WakeReply, error) {
-	meta.RLock()
-	meta0 := meta
-	meta.RUnlock()
-	fmt.Printf("%s : %s 被唤醒\n", time.Now().Format("2006-01-02 15:04:05"), meta0.serversAddress[*shardIdx])
-	if meta0.serversStatus[*shardIdx] != serverStatus.Sleep {
-		return &pb.WakeReply{Status: statusCode.Failed, Result: "该节点不在休眠状态", Version: meta0.version}, nil
+	// 未知情况。。。
+	if !atomic.CompareAndSwapInt32(&status, 1, 0) {
+		log.Panicf("%d : 节点不在休眠状态\n", atomic.LoadInt64(shardIdx))
 	}
-	meta.Lock()
-	meta.serversStatus[*shardIdx] = serverStatus.Working
-	meta.version++
-	meta.Unlock()
-	meta0.version++
-	syncConf()
-	return &pb.WakeReply{Status: statusCode.Ok, Version: meta0.version}, nil
+	// 被唤醒并接受分裂的节点
+	atomic.StoreInt64(&meta.next, in.GetNext())
+	atomic.StoreInt64(&meta.level, in.GetLevel())
+	version := atomic.LoadInt64(&meta.version)
+	fmt.Printf("%s  节点被唤醒\n", time.Now().Format("2006-01-02 15:04:05"))
+	return &pb.WakeReply{Status: statusCode.Ok, Version: version}, nil
 }
 
 func check(e error) {
@@ -540,13 +590,14 @@ func check(e error) {
 func initConf() {
 	flag.Parse()
 
+	statusCode.Init()
+	errorCode.Init()
+	serverStatus.Init()
 	// check(err)
 	operations = make([][]string, 0)
 	meta.Lock()
 	meta.hashSize = 4
 	meta.serversAddress = make(map[int64]string)
-	meta.serversStatus = make(map[int64]string)
-	meta.serversMaxKey = make(map[int64]int64)
 	canSplit = true
 	atomic.StoreInt64(&spliting, 0)
 	defer flag.Parse()
@@ -571,26 +622,28 @@ func initConf() {
 		port := int64(ShardNodeConfs["base_port"].(float64))
 		address := fmt.Sprintf("%s:%d", ip, port)
 		meta.serversAddress[idx] = address
-		meta.serversStatus[idx] = ShardNodeConfs["status"].(string)
-		meta.serversMaxKey[idx] = int64(ShardNodeConfs["max_key"].(float64))
+		if idx == *shardIdx {
+			atomic.StoreInt64(&maxKey, int64(ShardNodeConfs["max_key"].(float64)))
+			if ShardNodeConfs["status"].(string) == serverStatus.Working {
+				atomic.StoreInt32(&status, 0)
+			} else {
+				fmt.Printf("%d : %s\n", *shardIdx, serverStatus.Working)
+				fmt.Printf("%d : %s\n", *shardIdx, ShardNodeConfs["status"].(string))
+				atomic.StoreInt32(&status, 1)
+			}
+		}
 		// fmt.Println(idx, ip, port)
 	}
 	meta.level = 0
 	meta.Unlock()
-	statusCode.Init()
-	errorCode.Init()
-	serverStatus.Init()
 }
 
 func hashFunc(key string) int64 {
-	meta.RLock()
-	meta0 := meta
-	meta.RUnlock()
 	posCRC16 := int64(crc16.Checksum([]byte(key), crc16.IBMTable))
-	pos := posCRC16 % (int64(math.Pow(2.0, float64(meta0.level))) * meta0.hashSize)
-	if pos < meta0.next { // 分裂过了的
-		pos = posCRC16 % (int64(math.Pow(2.0, float64(meta0.level+1))) * meta0.hashSize)
-	}
+	pos := posCRC16 % (int64(math.Pow(2.0, float64(atomic.LoadInt64(&meta.level))) * float64(atomic.LoadInt64(&meta.hashSize))))
+	// if pos < atomic.LoadInt64(&meta.next) { // 分裂过了的
+	// 	pos = posCRC16 % (int64(math.Pow(2.0, float64(atomic.LoadInt64(&meta.next)+1))) * atomic.LoadInt64(&meta.hashSize))
+	// }
 	return pos
 	// return 1
 }
@@ -603,30 +656,25 @@ func main() {
 }
 
 func printConf() {
-	meta.RLock()
-	meta0 := meta
-	meta.RUnlock()
+	addresses := copyAddress(&meta)
 	fmt.Printf("db:\n%s\n", db.scan())
 	// fmt.Printf("servers:\n%s\n", serversAddress)
-	for idx, addr := range meta0.serversAddress {
+	for idx, addr := range addresses {
 		fmt.Printf("%d %s\t", idx, addr)
 	}
 	fmt.Println()
 	// fmt.Printf("status:\n%s\n", serversStatus)
-	for idx, maxKey := range meta0.serversMaxKey {
-		fmt.Printf("%d %d\t", idx, maxKey)
-	}
 	fmt.Println()
 
 	// fmt.Printf("maxKey:\n%s\n", serversMaxKey)
-	for idx, status := range meta0.serversStatus {
-		fmt.Printf("%d %s\t", idx, status)
-	}
+	// for idx, status := range meta0.serversStatus {
+	// 	fmt.Printf("%d %s\t", idx, status)
+	// }
 	fmt.Println()
 	fmt.Printf("shardIdx:\n%d\n", *shardIdx)
-	fmt.Printf("next:\n%d\n", meta0.next)
-	fmt.Printf("level:\n%d\n", meta0.level)
-	fmt.Printf("hashSize:\n%d\n", meta0.hashSize)
+	fmt.Printf("next:\n%d\n", atomic.LoadInt64(&meta.next))
+	fmt.Printf("level:\n%d\n", atomic.LoadInt64(&meta.level))
+	fmt.Printf("hashSize:\n%d\n", atomic.LoadInt64(&meta.hashSize))
 	fmt.Printf("conf:\n%s\n", *conf)
 }
 
@@ -644,4 +692,14 @@ func serve() {
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)
 	}
+}
+
+func copyAddress(m *Meta) map[int64]string {
+	meta.RLock()
+	addresses := make(map[int64]string, len(meta.serversAddress))
+	for k, v := range meta.serversAddress {
+		addresses[k] = v
+	}
+	meta.RUnlock()
+	return addresses
 }

@@ -26,6 +26,8 @@ message SetReply {
     string result = 3;
     int64 target = 4; // moved, 此key真正的存储节点
     int64 version = 5;
+    int64 next = 6;
+    int64 level = 7;
 }
 
 message GetRequest {
@@ -53,7 +55,8 @@ message DelReply {
 }
 
 message SplitRequest {
-    int64 port = 1;
+    int64 next = 1;
+    int64 level = 2;
 }
 
 message SplitReply {
@@ -62,6 +65,8 @@ message SplitReply {
     int64 result = 3;
     bool full = 4;
     int64 version = 5;
+    int64 next = 6;
+    int64 level = 7;
 }
 
 message ScanRequest {
@@ -117,11 +122,14 @@ message GetConfReply {
     }
     repeated ServConf server = 7;
     int64 version = 8;
+    int64 shardIdx = 9;
+    int32 serverStatus = 10;    
 }
 
 
 message WakeRequest {
-    int64 noname = 1; // 不知道要啥参数
+    int64 next = 1;
+    int64 level = 2;
 }
 
 message WakeReply {

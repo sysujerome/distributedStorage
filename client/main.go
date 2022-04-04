@@ -12,8 +12,8 @@ import (
 	"math"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -34,6 +34,7 @@ type Meta struct {
 	level          int64
 	hashSize       int64
 	version        int64
+	sync.RWMutex
 }
 
 var (
@@ -114,61 +115,89 @@ func main() {
 
 	}
 
+	// ConcurrenceTest()
 }
 
 func scan(operations []string) {
-	var conns []*grpc.ClientConn
+	meta.RLock()
+	addresses := make(map[int64]string)
 	for idx := 0; idx < len(meta.serversAddress); idx++ {
-		addr := meta.serversAddress[int64(idx)]
+		addresses[int64(idx)] = meta.serversAddress[int64(idx)]
+	}
+	meta.RUnlock()
+	var conns []*grpc.ClientConn
+	for idx := 0; idx < len(addresses); idx++ {
+		addr := addresses[int64(idx)]
 		conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		check(err)
 		conns = append(conns, conn)
+		fmt.Printf("%s\n", addr)
 	}
+	// return
 	total := 0
-	for idx := 0; idx < len(meta.serversAddress); idx++ {
-		server := meta.serversAddress[int64(idx)]
-		if len(operations) > 1 {
-			if operations[1] == "conf" {
-				c := pb.NewStorageClient(conns[0])
-				ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
-				defer cancel()
-				reply, err := c.GetConf(ctx, &pb.GetConfRequest{})
-				check(err)
-				fmt.Printf("conf: \n%s\n", reply.GetResult())
-				servers := reply.GetServer()
-				for _, server := range servers {
-					fmt.Printf("idx : %d\n", server.Idx)
-					fmt.Printf("address : %s\n", server.Address)
-					fmt.Printf("maxKey: %d\n", server.MaxKey)
-					fmt.Printf("status: %s\n\n", server.Status)
-				}
-				break
-			}
 
-			index, err := strconv.Atoi(operations[1])
-			check(err)
-			c := pb.NewStorageClient(conns[index])
-			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
-			defer cancel()
-			reply, err := c.Scan(ctx, &pb.ScanRequest{})
-			check(err)
-			fmt.Printf("status: %s\n", meta.serversStatus[int64(idx)])
-			fmt.Printf("count: %d\n", reply.GetCount())
-			fmt.Printf("result:\n%s\n\n", reply.GetResult())
-			break
-		}
-		fmt.Printf("idx: %d\n", idx)
-		fmt.Println(server)
-		fmt.Printf("status: %s\n", meta.serversStatus[int64(idx)])
-		c := pb.NewStorageClient(conns[idx])
-		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
+	for i := 0; i < len(conns); i++ {
+		client := pb.NewStorageClient(conns[i])
+		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 		defer cancel()
-		reply, err := c.Scan(ctx, &pb.ScanRequest{})
+		reply, err := client.GetConf(ctx, &pb.GetConfRequest{})
 		check(err)
-		count := reply.GetCount()
-		fmt.Printf("count: %d\n\n", count)
-		total += int(count)
+		fmt.Printf("%d :\n", i)
+		// fmt.Printf("GetServer : %s\n", reply.GetServer()[i])
+		fmt.Printf("GetShardIdx : %d\n", reply.GetShardIdx())
+		fmt.Printf("GetStatus : %s\n", reply.GetStatus())
+		fmt.Printf("GetNext : %d\n", reply.GetNext())
+		fmt.Printf("GetLevel : %d\n", reply.GetLevel())
+		fmt.Printf("GetHashSize : %d\n", reply.GetHashSize())
+		fmt.Printf("GetVersion : %d\n", reply.GetVersion())
+		fmt.Printf("GetServerStatus : %d\n", reply.GetServerStatus())
+		fmt.Println()
 	}
+
+	// for idx := 0; idx < len(addresses); idx++ {
+	// 	server := addresses[int64(idx)]
+	// 	if len(operations) > 1 {
+	// 		if operations[1] == "conf" {
+	// 			c := pb.NewStorageClient(conns[0])
+	// 			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
+	// 			defer cancel()
+	// 			reply, err := c.GetConf(ctx, &pb.GetConfRequest{})
+	// 			check(err)
+	// 			fmt.Printf("conf: \n%s\n", reply.GetResult())
+	// 			servers := reply.GetServer()
+	// 			for _, server := range servers {
+	// 				fmt.Printf("idx : %d\n", server.Idx)
+	// 				fmt.Printf("address : %s\n", server.Address)
+	// 				fmt.Printf("maxKey: %d\n", server.MaxKey)
+	// 				fmt.Printf("status: %s\n\n", server.Status)
+	// 			}
+	// 			break
+	// 		}
+
+	// 		index, err := strconv.Atoi(operations[1])
+	// 		check(err)
+	// 		c := pb.NewStorageClient(conns[index])
+	// 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
+	// 		defer cancel()
+	// 		reply, err := c.Scan(ctx, &pb.ScanRequest{})
+	// 		check(err)
+	// 		fmt.Printf("status: %s\n", meta.serversStatus[int64(idx)])
+	// 		fmt.Printf("count: %d\n", reply.GetCount())
+	// 		fmt.Printf("result:\n%s\n\n", reply.GetResult())
+	// 		break
+	// 	}
+	// 	fmt.Printf("idx: %d\n", idx)
+	// 	fmt.Println(server)
+	// 	fmt.Printf("status: %s\n", meta.serversStatus[int64(idx)])
+	// 	c := pb.NewStorageClient(conns[idx])
+	// 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
+	// 	defer cancel()
+	// 	reply, err := c.Scan(ctx, &pb.ScanRequest{})
+	// 	check(err)
+	// 	count := reply.GetCount()
+	// 	fmt.Printf("count: %d\n\n", count)
+	// 	total += int(count)
+	// }
 	fmt.Printf("Total : %d\n", total)
 	for _, conn := range conns {
 		conn.Close()
@@ -236,6 +265,10 @@ func get(operations []string) {
 	for _, conn := range conns {
 		conn.Close()
 	}
+}
+
+func sset() {
+
 }
 
 func test() {
@@ -470,38 +503,25 @@ func ConcurrenceTest() {
 	test := func(routineIndex int, routineCount int) {
 
 		// 为了减少冲突，每个goroutine拥有单独的元数据
+		// meta.
 
-		var serversAddress map[int64]string = meta.serversAddress
-		var serversStatus map[int64]string = meta.serversStatus
-		var serversMaxKey map[int64]int64 = meta.serversMaxKey
-		var next int64 = meta.next
-		var level int64 = meta.level
-		var hashSize int64 = meta.hashSize
-		var version int64 = meta.version
-
-		syncConf := func(c pb.StorageClient, ctx context.Context) {
-			reply, err := c.GetConf(ctx, &pb.GetConfRequest{})
-			check(err)
-			if reply.GetStatus() != statusCode.Ok {
-				fmt.Println(reply.GetStatus())
-				fmt.Println(statusCode.Ok)
-				fmt.Println("同步服务器配置出错...")
-			}
-			next = reply.GetNext()
-			level = reply.GetLevel()
-			hashSize = reply.GetHashSize()
-			for _, server := range reply.GetServer() {
-				idx := server.Idx
-				serversAddress[int64(idx)] = server.Address
-				serversMaxKey[int64(idx)] = server.MaxKey
-				serversStatus[int64(idx)] = server.Status
-			}
-			version = reply.GetVersion()
+		meta.RLock()
+		addresses := make(map[int64]string)
+		for k, v := range meta.serversAddress {
+			addresses[k] = v
 		}
+		meta.RUnlock()
+		// var serversAddress map[int64]string = meta.serversAddress
+		// var serversStatus map[int64]string = meta.serversStatus
+		// var serversMaxKey map[int64]int64 = meta.serversMaxKey
+		// var next int64 = meta.next
+		// var level int64 = meta.level
+		// var hashSize int64 = meta.hashSize
+		// var version int64 = meta.version
 
 		var clients []pb.StorageClient
-		for idx := 0; idx < len(serversAddress); idx++ {
-			addr := serversAddress[int64(idx)]
+		for idx := 0; idx < len(addresses); idx++ {
+			addr := addresses[int64(idx)]
 			conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 			check(err)
 			c := pb.NewStorageClient(conn)
@@ -511,14 +531,49 @@ func ConcurrenceTest() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(1*time.Second))
 		defer cancel()
 		syncConf(clients[0], ctx)
-
 		hashFunc := func(key string) int64 {
 			posCRC16 := int64(crc16.Checksum([]byte(key), crc16.IBMTable))
-			pos := posCRC16 % (int64(math.Pow(2.0, float64(level))) * hashSize)
-			if pos < next { // 分裂过了的
-				pos = posCRC16 % (int64(math.Pow(2.0, float64(level+1))) * hashSize)
-			}
+			pos := posCRC16 % (int64(math.Pow(2.0, float64(atomic.LoadInt64(&meta.level)))) * atomic.LoadInt64(&meta.hashSize))
+			// if pos < meta0.next { // 分裂过了的
+			// 	pos = posCRC16 % (int64(math.Pow(2.0, float64(meta0.level+1))) * meta0.hashSize)
+			// }
 			return pos
+		}
+		var set func(idx int64, key string)
+		set = func(idx int64, key string) {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
+			defer cancel()
+			reply, err := clients[idx].Set(ctx, &pb.SetRequest{Key: key})
+			check(err)
+			if reply.GetStatus() == statusCode.Moved {
+				// fmt.Printf("%s : %d -> %d ... first moved\n", key, idx, reply.GetTarget())
+				// fmt.Printf("%s : server[%d] next, level : %d %d \n", key, idx, reply.GetNext(), reply.GetLevel())
+				// fmt.Printf("%s : local next,  level : %d %d \n", key, atomic.LoadInt64(&meta.next), atomic.LoadInt64(&meta.level))
+				// 更新元数据
+				atomic.StoreInt64(&meta.next, reply.GetNext())
+				atomic.StoreInt64(&meta.level, reply.GetLevel())
+				// fmt.Printf("%s : local next,  level : %d %d ... after store\n", key, atomic.LoadInt64(&meta.next), atomic.LoadInt64(&meta.level))
+				// 更新后元数据
+				idx = hashFunc(key)
+				if idx != reply.GetTarget() {
+					panic(fmt.Sprintf("%s : server idx, local idx : %d, %d\n", key, reply.GetTarget(), idx))
+				}
+				reply, err = clients[idx].Set(ctx, &pb.SetRequest{Key: key})
+				check(err)
+				if reply.GetStatus() == statusCode.Moved {
+					fmt.Printf("%s : server[%d] next, level : %d %d \n", key, idx, reply.GetNext(), reply.GetLevel())
+					fmt.Printf("%s : local next,  level : %d %d \n", key, atomic.LoadInt64(&meta.next), atomic.LoadInt64(&meta.level))
+					panic(fmt.Sprintf("%s : %d -> %d second moved, failed.\n", key, idx, reply.GetTarget()))
+				}
+			} else if reply.GetStatus() == statusCode.Failed {
+				// fmt.Printf("%s : Err : %s, server : %s\n", key, reply.GetErr(), addresses[idx])
+				if reply.GetErr() == errorCode.NotWorking {
+					idx -= int64(math.Pow(2.0, float64(atomic.LoadInt64(&meta.level)-1))) * atomic.LoadInt64(&meta.hashSize)
+					set(idx, key)
+				} else {
+					panic(fmt.Sprintf("%s : Err : %s, server : %s", key, reply.GetErr(), addresses[idx]))
+				}
+			}
 		}
 		// SET
 		nextSecond := time.Now().Add(100 * time.Millisecond)
@@ -530,51 +585,11 @@ func ConcurrenceTest() {
 			}
 			key := keys[pos]
 
-			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
 			defer cancel()
 			// 每次都要同步配置文件
 			// syncConf(clients[0], ctx)
 			idx := hashFunc(key)
-			reply, err := clients[idx].Set(ctx, &pb.SetRequest{Key: key})
-			check(err)
-			if reply.GetVersion() != version {
-				syncConf(clients[idx], ctx)
-			}
-			if err != nil || reply.GetStatus() == statusCode.Failed {
-				for reply.GetErr() == errorCode.NotWorking {
-					reply, err = clients[idx].Set(ctx, &pb.SetRequest{Key: key})
-					check(err)
-				}
-				if err != nil || reply.GetStatus() == statusCode.Failed {
-					fmt.Printf("%s status: %s\n", serversAddress[idx], reply.GetStatus())
-					panic(reply.GetErr())
-
-				}
-			}
-
-			// 如果出现moved状态码，说明集群状态已经改变，需要同步配置文件
-			if reply.GetStatus() == statusCode.Moved {
-				target := reply.GetTarget()
-				syncConf(clients[target], ctx)
-				reply1, err := clients[target].Set(ctx, &pb.SetRequest{Key: key})
-				check(err)
-				if err != nil || reply1.GetStatus() == statusCode.Failed {
-					for reply.GetErr() == errorCode.NotWorking {
-						reply, err = clients[idx].Set(ctx, &pb.SetRequest{Key: key})
-						check(err)
-					}
-					if err != nil || reply.GetStatus() == statusCode.Failed {
-						fmt.Printf("%s status: %s\n", serversAddress[idx], reply.GetStatus())
-						panic(reply.GetErr())
-
-					}
-				}
-			}
-			if reply.GetVersion() != version {
-				syncConf(clients[idx], ctx)
-			}
-			// fmt.Println(reply.GetStatus())
-
+			set(idx, key)
 			// 按间隔输出qps
 			if time.Now().After(nextSecond) {
 				// 	// fmt.Printf("%d echo... per second\n", i-preIndex)
@@ -582,10 +597,11 @@ func ConcurrenceTest() {
 				preIndex = int64(i)
 				nextSecond = time.Now().Add(100 * time.Millisecond)
 			}
+			// time.Sleep(time.Millisecond * 300)
 		}
 	}
 
-	routineCount := 3
+	routineCount := 10
 	for i := 0; i < routineCount; i++ {
 		go test(i, routineCount)
 	}
@@ -729,10 +745,10 @@ func printConf() {
 
 func hashFunc(key string) int64 {
 	posCRC16 := int64(crc16.Checksum([]byte(key), crc16.IBMTable))
-	pos := posCRC16 % (int64(math.Pow(2.0, float64(meta.level))) * meta.hashSize)
-	if pos < meta.next { // 分裂过了的
-		pos = posCRC16 % (int64(math.Pow(2.0, float64(meta.level+1))) * meta.hashSize)
-	}
+	pos := posCRC16 % (int64(math.Pow(2.0, float64(atomic.LoadInt64(&meta.level)))) * atomic.LoadInt64(&meta.hashSize))
+	// if pos < meta.next { // 分裂过了的
+	// 	pos = posCRC16 % (int64(math.Pow(2.0, float64(meta.level+1))) * meta.hashSize)
+	// }
 	return pos
 	// return 1
 }

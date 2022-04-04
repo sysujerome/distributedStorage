@@ -19,8 +19,7 @@ cluster_name=(
 
 path="/home/thu/lab/deploy"
 ssh -t -t ${cluster_name[$1]} << EOF
-    cd ${path}
-    echo log>>>>>>>>>>>>>>>>>>>>>
-    cat log
+    echo "log>>>>>>>>>>>>>>>>>>>>>"
+    cat $path/log
     exit
 EOF
