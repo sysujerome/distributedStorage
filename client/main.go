@@ -586,8 +586,7 @@ func ConcurrenceTest() {
 			key := keys[pos]
 
 			defer cancel()
-			// 每次都要同步配置文件
-			// syncConf(clients[0], ctx)
+
 			idx := hashFunc(key)
 			set(idx, key)
 			// 按间隔输出qps
@@ -601,7 +600,7 @@ func ConcurrenceTest() {
 		}
 	}
 
-	routineCount := 10
+	routineCount := 60
 	for i := 0; i < routineCount; i++ {
 		go test(i, routineCount)
 	}

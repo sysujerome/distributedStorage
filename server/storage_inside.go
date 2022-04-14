@@ -126,8 +126,7 @@ func (s *server) Get(ctx context.Context, in *pb.GetRequest) (*pb.GetReply, erro
 
 func (s *server) Set(ctx context.Context, in *pb.SetRequest) (*pb.SetReply, error) {
 	// 先检查当前节点状态
-
-	// fmt.Printf("Income : %s\n", in.GetKey())
+	// 检查当前节点状态为1，此节点正在休眠，返回fail和notworking的错误码
 	if atomic.LoadInt32(&status) == 1 {
 		version := atomic.LoadInt64(&meta.version)
 		return &pb.SetReply{Result: "", Status: statusCode.Failed, Err: errorCode.NotWorking, Version: version}, nil
@@ -142,6 +141,7 @@ func (s *server) Set(ctx context.Context, in *pb.SetRequest) (*pb.SetReply, erro
 				Next: atomic.LoadInt64(&meta.next), Level: atomic.LoadInt64(&meta.level)}, nil
 		}
 	}
+	// 节点正在分裂
 	if atomic.LoadInt32(&status) == 2 {
 		// time.Sleep(time.Millisecond)
 		// fmt.Printf("-")
@@ -214,9 +214,6 @@ func split() {
 		if retry > 16 {
 			panic("Too much retry... in split moved.")
 		}
-		// atomic.StoreInt64(&meta.next, reply.GetNext())
-		// atomic.StoreInt64(&meta.level, reply.GetLevel())
-		// panic(fmt.Sprintf("分裂的不是这个节点，想要分裂的节点：%s, 指向的节点：%s", addr, addresses[reply.GetNext()]))
 		addr = addresses[reply.GetNext()]
 		conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		check(err)
@@ -232,9 +229,6 @@ func split() {
 		fmt.Printf("server split : %s\n", reply.GetStatus())
 		panic(fmt.Sprintf("server split failed : %s", addr))
 	}
-	// if reply.GetFull() {
-	// 	// fmt.Println("分裂失败, 节点满了。。。")
-	// }
 }
 
 func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply, error) {
@@ -378,7 +372,6 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 		// atomic.StoreInt32(&status, 1)
 		// meta.Unlock()
 		// atomic.StoreInt32(&status, 0)
-		syncConf()
 		// fmt.Printf("%s : 分裂完成....\n", serversAddress[secondIdx])
 		// 内部分裂完成，处理存起来的操作
 		// fmt.Println("处理存起来的操作...")
@@ -456,39 +449,6 @@ func (s *server) Scan(ctx context.Context, in *pb.ScanRequest) (*pb.ScanReply, e
 	// result += fmt.Sprintf("%s", db.scan())
 	result += db.scan()
 	return &pb.ScanReply{Result: result, Status: statusCode.Ok, Count: int64(count), Version: atomic.LoadInt64(&meta.version)}, nil
-}
-
-func syncConf() {
-	return
-	addresses := copyAddress(&meta)
-	request := pb.SyncConfRequest{}
-	request.Begin = *shardIdx
-	request.HashSize = atomic.LoadInt64(&meta.hashSize)
-	request.Level = atomic.LoadInt64(&meta.level)
-	request.Next = atomic.LoadInt64(&meta.next)
-	request.Server = make([]*pb.SyncConfRequest_ServConf, 0)
-	request.CanSplit = canSplit
-	for idx, addr := range addresses {
-		var server pb.SyncConfRequest_ServConf
-		server.Address = addr
-		server.Idx = idx
-		request.Server = append(request.Server, &server)
-	}
-	target := *shardIdx + 1
-	if target == int64(len(addresses)) {
-		target = 0
-	}
-	serv := addresses[target]
-	conn, err := grpc.Dial(serv, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	check(err)
-	c := pb.NewStorageClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(2*time.Second))
-	defer cancel()
-	reply, err := c.SyncConf(ctx, &request)
-	check(err)
-	if reply.GetStatus() != statusCode.Ok {
-		fmt.Printf("%s : 同步失败。。。\n", addresses[*shardIdx])
-	}
 }
 
 func (s *server) SyncConf(ctx context.Context, in *pb.SyncConfRequest) (*pb.SyncConfReply, error) {
