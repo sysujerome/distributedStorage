@@ -560,7 +560,7 @@ func initConf() {
 	meta.Lock()
 	meta.hashSize = 4
 	meta.serversAddress = make(map[int64]string)
-	canSplit = true
+	canSplit = false
 	atomic.StoreInt64(&spliting, 0)
 	defer flag.Parse()
 	curPath, err := os.Getwd()
