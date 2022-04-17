@@ -44,6 +44,7 @@ var (
 	serverStatus common.ServerStatus
 	canSplit     bool
 	// mutex          sync.Mutex
+	overflow string
 	spliting int64
 	maxKey   int64
 	status   int32 // 0 for work, 1 for sleep, 2 for splitting, 3 for full
@@ -554,6 +555,7 @@ func initConf() {
 	errorCode.Init()
 	serverStatus.Init()
 	// check(err)
+	overflow = "overflowFile"
 	operations = make([][]string, 0)
 	meta.Lock()
 	meta.hashSize = 4
@@ -606,6 +608,13 @@ func hashFunc(key string) int64 {
 	// }
 	return pos
 	// return 1
+}
+
+func storeInFile(key string) {
+	file, err := os.OpenFile(overflow, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
+	check(err)
+	_, err = file.WriteString(key + "\t")
+	check(err)
 }
 
 func main() {
