@@ -147,12 +147,13 @@ func (s *server) Set(ctx context.Context, in *pb.SetRequest) (*pb.SetReply, erro
 		// time.Sleep(time.Millisecond)
 		// fmt.Printf("-")
 		operations = append(operations, []string{"set", in.GetKey()})
-		fmt.Printf("Store : %s\n", in.GetKey())
+		// fmt.Printf("Store : %s\n", in.GetKey())
 		return &pb.SetReply{Result: "", Status: statusCode.Stored, Err: errorCode.Stored}, nil
 	}
 	// }
-
-	if int64(db.len) >= maxKey {
+	newMaxKey := int64(float64(maxKey) * 1.25)
+	if atomic.CompareAndSwapInt64(&maxKey, db.len, newMaxKey) {
+		// if int64(db.len) >= maxKey {
 		// 继续放在本地db上
 		// 将maxKey值扩大为1.25倍
 		maxKey = int64(float64(maxKey) * 1.25)
@@ -213,7 +214,8 @@ func split() {
 	for reply.GetStatus() == statusCode.Moved {
 		retry++
 		if retry > 16 {
-			panic("Too much retry... in split moved.")
+			// panic("Too much retry... in split moved.")
+			return
 		}
 		addr = addresses[reply.GetNext()]
 		conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -267,19 +269,6 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 	}
 	meta.RUnlock()
 
-	// 分裂时一直新建连接会出现too many open files错误
-	// 和每个节点建立一个长连接
-	var clients []pb.StorageClient
-	for idx := 0; idx < len(addresses); idx++ {
-		addr := addresses[int64(idx)]
-		conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
-		check(err)
-		c := pb.NewStorageClient(conn)
-		clients = append(clients, c)
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
-	defer cancel()
-
 	splitInside := func() { // 内部元素分裂
 		// 原子比较该节点是不是正在分裂，保证只有该节点只分裂一次
 		if !atomic.CompareAndSwapInt32(&status, 0, 2) {
@@ -306,7 +295,35 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 		fmt.Printf("Next : %d\tLevel : %d\n", atomic.LoadInt64(&meta.next), atomic.LoadInt64(&meta.level))
 
 		// 需要将next指针改变之后的数据同步到对应的wakeup节点，不然会出现同一个key的元数据不一致报错  (0->4 ==> 4->0 死循环)
-		reply, err := clients[secondIdx].WakeUp(ctx, &pb.WakeRequest{Next: atomic.LoadInt64(&meta.next), Level: atomic.LoadInt64(&meta.level)})
+
+		// 分裂时一直新建连接会出现too many open files错误
+		// 和每个节点建立一个长连接
+		var clients []pb.StorageClient
+		clientCount := 100
+		clientID := 0
+		var lock sync.Mutex
+		getClientID := func() int {
+			lock.Lock()
+			defer lock.Unlock()
+			id := clientID
+			clientID++
+			if clientID >= clientCount {
+				clientID = 0
+			}
+			return id
+		}
+
+		for idx := 0; idx < int(clientCount); idx++ {
+			addr := addresses[secondIdx]
+			conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+			check(err)
+			c := pb.NewStorageClient(conn)
+			clients = append(clients, c)
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(1*time.Second))
+		defer cancel()
+
+		reply, err := clients[getClientID()].WakeUp(ctx, &pb.WakeRequest{Next: atomic.LoadInt64(&meta.next), Level: atomic.LoadInt64(&meta.level)})
 		check(err)
 		if reply.GetStatus() != statusCode.Ok {
 			fmt.Printf("节点唤醒失败 : %s %s ....\n", addresses[*shardIdx], addresses[secondIdx])
@@ -325,10 +342,10 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 
 		// fmt.Printf("%d : 开始分裂....\n", shardIdx)
 		count := 0
-		set := func(idx int64, key string) {
+		set := func(key string) {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
 			defer cancel()
-			reply, err := clients[idx].Set(ctx, &pb.SetRequest{Key: key})
+			reply, err := clients[getClientID()].Set(ctx, &pb.SetRequest{Key: key})
 			check(err)
 			if reply.GetStatus() == statusCode.Moved {
 				fmt.Printf("%s : %d -> %d ... first moved\n", key, idx, reply.GetTarget())
@@ -343,31 +360,39 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 				if idx != reply.GetTarget() {
 					panic(fmt.Sprintf("%s : server idx, local idx : %d, %d\n", key, reply.GetTarget(), idx))
 				}
-				reply, err = clients[idx].Set(ctx, &pb.SetRequest{Key: key})
+				reply, err = clients[getClientID()].Set(ctx, &pb.SetRequest{Key: key})
 				check(err)
 				if reply.GetStatus() == statusCode.Moved {
-					panic(fmt.Sprintf("%s : %d -> %d second moved, failed.\n", key, idx, reply.GetTarget()))
+					// panic(fmt.Sprintf("%s : %d -> %d second moved, failed.\n", key, idx, reply.GetTarget()))
 				}
 			} else if reply.GetStatus() == statusCode.Failed {
 				panic(fmt.Sprintf("%s : Err : %s", key, reply.GetErr()))
 			}
 		}
 		// 分裂操作核心代码
-		for index := 0; index < length; index++ {
-			tempData := make([]string, 0) //学习redis来进行渐进性rehash
-			db.slots[index].Lock()
-			for _, key := range db.slots[index].data {
-				if hashFunc(key) == secondIdx {
-					set(secondIdx, key)
-					count++
-				} else {
-					tempData = append(tempData, key)
-				}
-			}
-			db.slots[index].data = tempData
-			db.slots[index].Unlock()
-		}
 
+		start := time.Now()
+		for i := 0; i < length; i++ {
+			// tempData := make([]string, 0) //学习redis来进行渐进性rehash
+
+			index := i
+			work := func() {
+				newID := 0
+				db.slots[index].Lock()
+				for _, key := range db.slots[index].data {
+					if hashFunc(key) == secondIdx {
+						set(key)
+						count++
+					} else {
+						db.slots[index].data[newID] = key
+						newID++
+					}
+				}
+				db.slots[index].Unlock()
+			}
+			go work()
+		}
+		fmt.Printf("分裂核心操作花了 : %s \n", time.Since(start))
 		// meta.Lock()
 		// meta.serversStatus[*shardIdx] = serverStatus.Working
 		// atomic.StoreInt32(&status, 1)
@@ -388,13 +413,7 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 					// db[operation[1]] = db[operation[2]]
 					db.set(operation[1])
 				} else {
-					reply, err := clients[idx].Set(ctx, &pb.SetRequest{Key: operation[1]})
-					if err != nil {
-						panic(err)
-					}
-					if reply.GetStatus() != statusCode.Ok {
-						panic(reply.GetStatus())
-					}
+					set(operation[1])
 				}
 				// db[operation[1]] = operation[2]
 			case "del":
@@ -422,8 +441,9 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 	}
 
 	// mutex.Unlock()
+	start := time.Now()
 	splitInside()
-
+	fmt.Printf("分裂操作花了 %s\n", time.Since(start))
 	// mutex.Lock()
 	// meta.version++
 	atomic.AddInt64(&meta.version, 1)
@@ -560,7 +580,7 @@ func initConf() {
 	meta.Lock()
 	meta.hashSize = 4
 	meta.serversAddress = make(map[int64]string)
-	canSplit = false
+	canSplit = true
 	atomic.StoreInt64(&spliting, 0)
 	defer flag.Parse()
 	curPath, err := os.Getwd()

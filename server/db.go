@@ -6,7 +6,7 @@ import (
 	"sync"
 )
 
-const length int = 16384
+const length int = 163
 
 type slot_t struct {
 	sync.RWMutex
@@ -15,7 +15,7 @@ type slot_t struct {
 
 type DataBase struct {
 	slots [length]slot_t
-	len   uint64
+	len   int64
 }
 
 func hashFuncInside(key string) uint16 {
