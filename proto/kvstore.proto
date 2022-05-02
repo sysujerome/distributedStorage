@@ -40,6 +40,8 @@ message GetReply {
     string result = 3;
     int64 target = 4; // moved, 此key真正的存储节点
     int64 version = 5;
+    int64 next = 6;
+    int64 level = 7;
 }
 
 message DelRequest {

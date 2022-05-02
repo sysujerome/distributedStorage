@@ -43,8 +43,8 @@ var (
 	errorCode    common.Error
 	serverStatus common.ServerStatus
 	canSplit     bool
-	// mutex          sync.Mutex
-	overflow string
+	// mutex        sync.Mutex
+	// overflow     string
 	spliting int64
 	maxKey   int64
 	status   int32 // 0 for work, 1 for sleep, 2 for splitting, 3 for full
@@ -72,7 +72,9 @@ func (s *server) Get(ctx context.Context, in *pb.GetRequest) (*pb.GetReply, erro
 	if hashFunc(in.GetKey()) != *shardIdx {
 		target := hashFunc(in.GetKey())
 		if target != *shardIdx {
-			return &pb.GetReply{Result: "", Status: statusCode.Moved, Err: errorCode.Moved, Target: target, Version: version}, nil
+			return &pb.GetReply{Result: "", Status: statusCode.Moved,
+				Err: errorCode.Moved, Target: target, Version: atomic.LoadInt64(&meta.version),
+				Next: atomic.LoadInt64(&meta.next), Level: atomic.LoadInt64(&meta.level)}, nil
 		}
 	}
 
@@ -299,7 +301,7 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 		// 分裂时一直新建连接会出现too many open files错误
 		// 和每个节点建立一个长连接
 		var clients []pb.StorageClient
-		clientCount := 100
+		clientCount := 163
 		clientID := 0
 		var lock sync.Mutex
 		getClientID := func() int {
@@ -333,14 +335,6 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 		fmt.Printf("节点唤醒成功: %s %s ...\n", addresses[*shardIdx], addresses[secondIdx])
 		// syncConf()
 
-		// thisAddress := serversAddress[]
-		// thisConn, err := grpc.Dial(thisAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
-		// check(err)
-		// defer thisConn.Close()
-		// thisClient := pb.NewStorageClient(thisConn)
-		// Contact the server and print out its response.
-
-		// fmt.Printf("%d : 开始分裂....\n", shardIdx)
 		count := 0
 		set := func(key string) {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(100*time.Second))
@@ -371,6 +365,7 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 		}
 		// 分裂操作核心代码
 
+		fmt.Printf("开始核心数据分裂 %s\n", time.Now().Format("2006-01-02 15:04:05"))
 		start := time.Now()
 		for i := 0; i < length; i++ {
 			// tempData := make([]string, 0) //学习redis来进行渐进性rehash
@@ -389,9 +384,28 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 					}
 				}
 				db.slots[index].Unlock()
+				fmt.Printf("Finished.\t%s\n", time.Now().Format("2006-01-02 15:04:05"))
 			}
 			go work()
+			// workByRedis := func() {
+			// 	// newID := 0
+			// 	newSlice := make([]string, 0)
+			// 	db.slots[index].Lock()
+			// 	for _, key := range db.slots[index].data {
+			// 		if hashFunc(key) == secondIdx {
+			// 			set(key)
+			// 			count++
+			// 		} else {
+			// 			newSlice = append(newSlice, key)
+			// 			// newID++
+			// 		}
+			// 	}
+			// 	db.slots[index].data = newSlice
+			// 	db.slots[index].Unlock()
+			// }
+			// go workByRedis()
 		}
+		// atomic.StoreInt32(&status, 0)
 		fmt.Printf("分裂核心操作花了 : %s \n", time.Since(start))
 		// meta.Lock()
 		// meta.serversStatus[*shardIdx] = serverStatus.Working
@@ -402,6 +416,7 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 		// 内部分裂完成，处理存起来的操作
 		// fmt.Println("处理存起来的操作...")
 		setCount := 0
+		start = time.Now()
 		for _, operation := range operations {
 
 			// 计算存起来的set操作有多少，看是否会出现积压过多导致二次分裂的问题
@@ -427,17 +442,11 @@ func (s *server) Split(ctx context.Context, in *pb.SplitRequest) (*pb.SplitReply
 				}
 			}
 		}
+		operations = operations[:0]
+		fmt.Printf("处理积压操作花了 : %s \n", time.Since(start))
+
 		fmt.Printf("%s 共处理 %d 个set积压操作\n", addresses[idx], setCount)
 
-		// // 分裂完成，后置条件：将next指针往后移动
-		// atomic.AddInt64(&meta.next, 1)
-		// // 一轮分裂已经完成，将next指针归零
-		// if atomic.LoadInt64(&meta.next) == int64(math.Pow(2, float64(atomic.LoadInt64(&meta.level))))*atomic.LoadInt64(&meta.hashSize) {
-		// 	atomic.StoreInt64(&meta.next, 0)
-		// }
-		// fmt.Printf("Next : %d\n", atomic.LoadInt64(&meta.next))
-		// // 该节点已经分裂过，所以针对该节点的数据，是需要将level值加1后重新计算的
-		// atomic.AddInt64(&meta.level, 1)
 	}
 
 	// mutex.Unlock()
@@ -575,7 +584,7 @@ func initConf() {
 	errorCode.Init()
 	serverStatus.Init()
 	// check(err)
-	overflow = "overflowFile"
+	// overflow = "overflowFile"
 	operations = make([][]string, 0)
 	meta.Lock()
 	meta.hashSize = 4
@@ -630,12 +639,12 @@ func hashFunc(key string) int64 {
 	// return 1
 }
 
-func storeInFile(key string) {
-	file, err := os.OpenFile(overflow, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
-	check(err)
-	_, err = file.WriteString(key + "\t")
-	check(err)
-}
+// func storeInFile(key string) {
+// 	file, err := os.OpenFile(overflow, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
+// 	check(err)
+// 	_, err = file.WriteString(key + "\t")
+// 	check(err)
+// }
 
 func main() {
 	flag.Parse()

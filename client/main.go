@@ -100,7 +100,8 @@ func main() {
 			get(operations)
 		case "set":
 			set(operations)
-
+		case "delay":
+			delay()
 		case "test":
 			// go test()
 			// go test()
@@ -480,7 +481,7 @@ func ConcurrenceTest() {
 		fmt.Println("Loading data...")
 		path, err := os.Getwd()
 		check(err)
-		filename := filepath.Join(path, "../data/workloada-load-5000000.log.formated")
+		filename := filepath.Join(path, "../data/workloadc-load-5000000.log.formated")
 		f, err := os.Open(filename)
 		check(err)
 		defer f.Close()
@@ -550,15 +551,16 @@ func ConcurrenceTest() {
 				// fmt.Printf("%s : server[%d] next, level : %d %d \n", key, idx, reply.GetNext(), reply.GetLevel())
 				// fmt.Printf("%s : local next,  level : %d %d \n", key, atomic.LoadInt64(&meta.next), atomic.LoadInt64(&meta.level))
 				// 更新元数据
-				atomic.StoreInt64(&meta.next, reply.GetNext())
-				atomic.StoreInt64(&meta.level, reply.GetLevel())
+				// 不更新，更新会导致出错更多
+				// atomic.StoreInt64(&meta.next, reply.GetNext())
+				// atomic.StoreInt64(&meta.level, reply.GetLevel())
 				// fmt.Printf("%s : local next,  level : %d %d ... after store\n", key, atomic.LoadInt64(&meta.next), atomic.LoadInt64(&meta.level))
 				// 更新后元数据
-				idx = hashFunc(key)
-				if idx != reply.GetTarget() {
-					panic(fmt.Sprintf("%s : server idx, local idx : %d, %d\n", key, reply.GetTarget(), idx))
-				}
-				reply, err = clients[idx].Set(ctx, &pb.SetRequest{Key: key})
+				// idx = hashFunc(key)
+				// if idx != reply.GetTarget() {
+				// 	panic(fmt.Sprintf("%s : server idx, local idx : %d, %d\n", key, reply.GetTarget(), idx))
+				// }
+				reply, err = clients[reply.GetTarget()].Set(ctx, &pb.SetRequest{Key: key})
 				check(err)
 				if reply.GetStatus() == statusCode.Moved {
 					fmt.Printf("%s : server[%d] next, level : %d %d \n", key, idx, reply.GetNext(), reply.GetLevel())
@@ -614,6 +616,162 @@ func ConcurrenceTest() {
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
+}
+
+func delay() {
+	operations := make([][]string, 0)
+	loadData := func() {
+		fmt.Println("Loading data...")
+		path, err := os.Getwd()
+		check(err)
+		filename := filepath.Join(path, "../data/workloadc-run-5000000.log.formated")
+		f, err := os.Open(filename)
+		check(err)
+		defer f.Close()
+		sc := bufio.NewScanner(f)
+		for sc.Scan() {
+			opt := strings.Split(sc.Text(), " ")
+			if len(opt) < 2 {
+				panic("too less operation!!!")
+			}
+			operation := make([]string, 2)
+			operation[0] = opt[0]
+			operation[1] = opt[1]
+			operations = append(operations, operation)
+		}
+		fmt.Println("Loading data finished...")
+	}
+	loadData()
+
+	test := func() {
+
+		// 为了减少冲突，每个goroutine拥有单独的元数据
+		meta.RLock()
+		addresses := make(map[int64]string)
+		for k, v := range meta.serversAddress {
+			addresses[k] = v
+		}
+		meta.RUnlock()
+
+		var clients []pb.StorageClient
+		for idx := 0; idx < len(addresses); idx++ {
+			addr := addresses[int64(idx)]
+			conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+			check(err)
+			c := pb.NewStorageClient(conn)
+			clients = append(clients, c)
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(1*time.Second))
+		defer cancel()
+		syncConf(clients[0], ctx)
+		hashFunc := func(key string) int64 {
+			posCRC16 := int64(crc16.Checksum([]byte(key), crc16.IBMTable))
+			pos := posCRC16 % (int64(math.Pow(2.0, float64(atomic.LoadInt64(&meta.level)))) * atomic.LoadInt64(&meta.hashSize))
+			return pos
+		}
+
+		var get func(idx int64, key string, ctx context.Context)
+		var set func(idx int64, key string, ctx context.Context)
+		get = func(idx int64, key string, ctx context.Context) {
+			reply, err := clients[idx].Get(ctx, &pb.GetRequest{Key: key})
+			check(err)
+			if reply.GetStatus() == statusCode.Moved {
+				// fmt.Printf("%s : %d -> %d ... first moved\n", key, idx, reply.GetTarget())
+				// fmt.Printf("%s : server[%d] next, level : %d %d \n", key, idx, reply.GetNext(), reply.GetLevel())
+				// fmt.Printf("%s : local next,  level : %d %d \n", key, atomic.LoadInt64(&meta.next), atomic.LoadInt64(&meta.level))
+				// 更新元数据
+				atomic.StoreInt64(&meta.next, reply.GetNext())
+				atomic.StoreInt64(&meta.level, reply.GetLevel())
+				// fmt.Printf("%s : local next,  level : %d %d ... after store\n", key, atomic.LoadInt64(&meta.next), atomic.LoadInt64(&meta.level))
+				// 更新后元数据
+				idx = hashFunc(key)
+				if idx != reply.GetTarget() {
+					panic(fmt.Sprintf("%s : server idx, local idx : %d, %d\n", key, reply.GetTarget(), idx))
+				}
+				reply, err = clients[idx].Get(ctx, &pb.GetRequest{Key: key})
+				check(err)
+				if reply.GetStatus() == statusCode.Moved {
+					fmt.Printf("%s : server[%d] next, level : %d %d \n", key, idx, reply.GetNext(), reply.GetLevel())
+					fmt.Printf("%s : local next,  level : %d %d \n", key, atomic.LoadInt64(&meta.next), atomic.LoadInt64(&meta.level))
+					panic(fmt.Sprintf("%s : %d -> %d second moved, failed.\n", key, idx, reply.GetTarget()))
+				}
+			} else if reply.GetStatus() == statusCode.Failed {
+				// fmt.Printf("%s : Err : %s, server : %s\n", key, reply.GetErr(), addresses[idx])
+				if reply.GetErr() == errorCode.NotWorking {
+					idx -= int64(math.Pow(2.0, float64(atomic.LoadInt64(&meta.level)-1))) * atomic.LoadInt64(&meta.hashSize)
+					get(idx, key, ctx)
+				} else {
+					panic(fmt.Sprintf("%s : Err : %s, server : %s", key, reply.GetErr(), addresses[idx]))
+				}
+			}
+		}
+		set = func(idx int64, key string, ctx context.Context) {
+			reply, err := clients[idx].Set(ctx, &pb.SetRequest{Key: key})
+			check(err)
+			if reply.GetStatus() == statusCode.Moved {
+				// fmt.Printf("%s : %d -> %d ... first moved\n", key, idx, reply.GetTarget())
+				// fmt.Printf("%s : server[%d] next, level : %d %d \n", key, idx, reply.GetNext(), reply.GetLevel())
+				// fmt.Printf("%s : local next,  level : %d %d \n", key, atomic.LoadInt64(&meta.next), atomic.LoadInt64(&meta.level))
+				// 更新元数据
+				atomic.StoreInt64(&meta.next, reply.GetNext())
+				atomic.StoreInt64(&meta.level, reply.GetLevel())
+				// fmt.Printf("%s : local next,  level : %d %d ... after store\n", key, atomic.LoadInt64(&meta.next), atomic.LoadInt64(&meta.level))
+				// 更新后元数据
+				idx = hashFunc(key)
+				if idx != reply.GetTarget() {
+					panic(fmt.Sprintf("%s : server idx, local idx : %d, %d\n", key, reply.GetTarget(), idx))
+				}
+				reply, err = clients[idx].Set(ctx, &pb.SetRequest{Key: key})
+				check(err)
+				if reply.GetStatus() == statusCode.Moved {
+					fmt.Printf("%s : server[%d] next, level : %d %d \n", key, idx, reply.GetNext(), reply.GetLevel())
+					fmt.Printf("%s : local next,  level : %d %d \n", key, atomic.LoadInt64(&meta.next), atomic.LoadInt64(&meta.level))
+					panic(fmt.Sprintf("%s : %d -> %d second moved, failed.\n", key, idx, reply.GetTarget()))
+				}
+			} else if reply.GetStatus() == statusCode.Failed {
+				// fmt.Printf("%s : Err : %s, server : %s\n", key, reply.GetErr(), addresses[idx])
+				if reply.GetErr() == errorCode.NotWorking {
+					idx -= int64(math.Pow(2.0, float64(atomic.LoadInt64(&meta.level)-1))) * atomic.LoadInt64(&meta.hashSize)
+					set(idx, key, ctx)
+				} else {
+					panic(fmt.Sprintf("%s : Err : %s, server : %s", key, reply.GetErr(), addresses[idx]))
+				}
+			}
+		}
+		// totalTime = time.Duration()
+		start := time.Now()
+
+		for i := 0; i < len(operations); i++ {
+			pos := i
+			if pos >= 5000000 {
+				break
+			}
+			if pos%100000 == 0 {
+				elapse := time.Since(start)
+				fmt.Printf("10w delay : %s\n", elapse)
+				start = time.Now()
+			}
+			operation := operations[pos]
+			opt := operation[0]
+			key := operation[1]
+			idx := hashFunc(key)
+			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(1*time.Second))
+			defer cancel()
+
+			// start := time.Now()
+			if opt == "INSERT" || opt == "UPDATE" {
+				set(idx, key, ctx)
+			} else if opt == "READ" {
+				get(idx, key, ctx)
+			}
+			// elapse := time.Since(start)
+			// fmt.Printf("%s\tdelay : %s\n", opt, elapse)
+		}
+	}
+
+	test()
+
 }
 
 func getServe(operation []string, conn *grpc.ClientConn) {
